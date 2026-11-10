@@ -7,9 +7,10 @@ import { themeCss, shellTokens, registry, registerShape, registerTheme, allTheme
 import { MENTION_ORIGIN, currentPart } from './text.js'
 import { SHELL_CSS, CONVERSATION_CSS, botOwnCss, installStyles, installCompiledStyles } from './styles.js'
 import { lookOf } from './mark.js'
-import { TeamSidebar, YouAvatar, AccountLauncher, FooterAccount, BrandMark, BrandName, BotReturn, SIDEBAR_CSS, RETURN_CSS, holdShellShortcuts } from './sidebar.js'
+import { TeamSidebar, YouAvatar, AccountLauncher, FooterAccount, BrandMark, BrandName, DsBotNavIcon, SIDEBAR_CSS, holdShellShortcuts } from './sidebar.js'
 import { installSettingsShell, SETTINGS_SHELL_CSS } from './settings-shell.js'
 import { frameLayout, readSidebar, writeSidebar, toggledPref, DSH_NARROW } from './frame-layout.js'
+import { SURFACE_SWITCH_CSS, installSurfaceSwitch } from './surface-switch.js'
 import { installFrameWatch } from './frame-watch.js'
 import { HeaderPill } from './header.js'
 import { ComposerPlus, ComposerVoice, menuIcons } from './composer.js'
@@ -1136,10 +1137,40 @@ export function apply(ctx) {
     // its cell; it lists only the sends the user authored (#663).
     () => shadow('conversation.input.dock', { id: 'queue', order: 20, priority: BOT_PRIORITY, inject: queueFace }, QueueDock),
   ]
-  // The return button belongs to neither group: it renders only in Agent mode.
-  ctx.effect(() => installCompiledStyles(RETURN_CSS, 'return'), 'ds-bot: return styles')
   ctx.effect(() => installCompiledStyles(COMPUTER_CSS, 'computer'), 'ds-bot: computer styles')
-  shadow('sidebar.footer.action', { id: 'bot-return', order: -300, inject: face }, BotReturn)
+  // The way into DS Bot in Agent mode: a row in the shell's own panel list, right
+  // under New session and above the first panel (plugins), wearing the team's whale.
+  // It registers no panel of its own, so the row's click — the shell's selectPanel —
+  // becomes the surface switch instead. The footer keeps only the account, and the
+  // window band keeps its switch, so no surface is ever a trap.
+  const BOT_NAV_ID = 'ds-bot-entry'
+  ctx.effect(() => {
+    const slots = ctx.slots
+    const offEntry = slots.inject('sidebar.panellist', () => slots.register({
+      name: 'sidebar.panellist', id: BOT_NAV_ID, order: -100, label: () => t('DS Bot'),
+    }, DsBotNavIcon))
+    const layout = ctx.layout
+    const original = layout?.selectPanel
+    if (typeof original !== 'function') return () => offEntry()
+    const patched = function (id, ...rest) {
+      if (id === BOT_NAV_ID) { actions.setSurface('bot'); return }
+      return original.call(this, id, ...rest)
+    }
+    layout.selectPanel = patched
+    return () => {
+      if (layout.selectPanel === patched) layout.selectPanel = original
+      offEntry()
+    }
+  }, 'ds-bot: Bot entry in the panel list')
+
+  // The mode switch in the window band, beside the shell's own view switch. It belongs
+  // to neither group, so it stays on screen in both surfaces: the way into DS Bot and
+  // the way back, without a settings trip.
+  ctx.effect(() => {
+    const style = installStyles(SURFACE_SWITCH_CSS, 'surface-switch')
+    const dispose = installSurfaceSwitch({ surface, actions })
+    return () => { dispose(); style.remove() }
+  }, 'ds-bot: surface switch')
 
   // The main view decides `plain`: a DSH Agent Session keeps the Bot shell but
   // withdraws the conversation replacements, so the native dsh page shows. A jump

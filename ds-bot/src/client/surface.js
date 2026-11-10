@@ -86,7 +86,10 @@ export function freePriority(entries, { priority, key, id }) {
 }
 
 export function readMode(storage = globalThis.localStorage) {
-  try { return storage.getItem(STORAGE.surface) === 'agent' ? 'agent' : 'bot' } catch { return 'bot' }
+  // Fork choice: a fresh surface starts on the native DSH interface, not on the Bot
+  // surface, so installing the plugin never hides the user's own workspace. The band
+  // switch (surface-switch.js) is the way in, and the choice is remembered from then on.
+  try { return storage.getItem(STORAGE.surface) === 'bot' ? 'bot' : 'agent' } catch { return 'agent' }
 }
 
 export function writeMode(mode, storage = globalThis.localStorage) {

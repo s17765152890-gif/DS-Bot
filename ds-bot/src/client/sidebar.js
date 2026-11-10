@@ -5,7 +5,7 @@ import { inkFill } from './inks.js'
 import { isMainOf } from './sources.js'
 import { currentPart, previewOf, relativeShort } from './text.js'
 import { PlusIcon, SearchIcon, SidebarIcon, GaugeIcon, ClockIcon, GearIcon, PinMarkIcon, ConnectorIcon, CloudDownloadIcon, SignInIcon, SignOutIcon, SlidersIcon, ChevronRightIcon, DotsIcon, FolderIcon } from './icons.js'
-import { lookOf, MAIN_LOOK } from './characters.js'
+import { lookOf, MAIN_LOOK, characterMarkup, shapeOf, MASK_ID } from './characters.js'
 import { botState, BotMark, BotAvatar, RoomAvatar } from './mark.js'
 import { AgentBadge } from './agent-badge.js'
 import { reducedMotion } from './activity-row.js'
@@ -1213,33 +1213,27 @@ export function FooterAccount(props) {
   return h('span', { className: 'bt-foot-account' }, h(AccountLauncher, { ...props, seat: false }))
 }
 
-// The only entry registered in every mode: in Agent mode the whole Bot surface is
-// withdrawn, and this button in the shell's own footer is the way back.
-export function BotReturn({ wide, useSurface, useRoster, actions }) {
-  const mode = useSurface(value => value.mode)
-  const ready = useRoster(value => value.ready)
-  // Agent mode draws no team sidebar; there this button is the team interface.
-  useReportReady(mode === 'agent' && ready)
-  if (mode !== 'agent') return null
-  return h('button', { type: 'button', className: 'bt-return', 'aria-label': t('DS Bot'), title: t('DS Bot'), onClick: () => actions.setSurface('bot') },
-    h(BotMark, { look: MAIN_LOOK, size: 20 }),
-    wide ? h('span', { className: 'bt-return-name' }, t('DS Bot')) : null)
-}
-
-// Agent mode has none of the shell-group styles, so the return button carries its own.
-export const RETURN_CSS = `
-.bt-return{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:0;border-radius:999px;background:none;color:inherit;font:inherit;font-size:14px;line-height:20px;cursor:pointer;transition:background-color .12s ease}
-.bt-return:hover{background:rgba(127,127,127,.14)}
-.bt-return:active{transform:scale(.96)}
-.bt-return .bt-mark{display:inline-flex;flex:none;line-height:0}
-.bt-return .bt-mark svg{width:100%;height:100%;overflow:visible}
-/* Shell styles carry --bt-ink-deepseek and Agent mode withdraws them; pin it here. */
-.bt-return .bt-mark{--bt-ink-deepseek:#4D6BFE}
-.bt-return-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-`
+// The way back into the Bot surface is the panel-list row in Agent mode
+// (index.js: the ds-bot-entry row), so the shell's footer keeps only the account.
 
 export function BrandMark({ size = 24 }) {
   return h('span', { className: 'bt-brand-whale' }, h(BotMark, { look: MAIN_LOOK, size }))
+}
+// The panel list's entry glyph: the Main Bot's whale, as a bare svg. The shell's icon
+// cell measures the element it is given, so a wrapper here would widen the row and
+// push the label over; the mask id is per mount because two rows would share it.
+let navMarkSerial = 0
+export function DsBotNavIcon({ size = 16 }) {
+  const box = shapeOf(MAIN_LOOK.shape).size
+  const mask = `bt-nav-mark-${++navMarkSerial}`
+  return h('svg', {
+    width: size,
+    height: size,
+    viewBox: `0 0 ${box} ${box}`,
+    'aria-hidden': true,
+    focusable: 'false',
+    dangerouslySetInnerHTML: { __html: characterMarkup(MAIN_LOOK.shape, MAIN_LOOK.color).replaceAll(MASK_ID, mask) },
+  })
 }
 export function BrandName() {
   return h('span', { style: { fontWeight: 600, fontSize: 14 } }, 'DS Bot')
