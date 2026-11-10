@@ -1,14 +1,21 @@
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg"><img src="docs/images/logo.svg" alt="DS Bot" width="260"></picture></p>
+<table align="center">
+<tr>
+<td align="center" width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg"><img src="docs/images/logo.svg" alt="DS Bot" width="260"></picture></td>
+<td align="center" width="50%"><img src="docs/images/dual-surface-switch.png" alt="The window-band switch beside the shell's own view switch, and the DS Bot row in the sidebar" width="260"></td>
+</tr>
+</table>
 
 # DS Bot
 
 English | [中文](README.zh.md)
 
+> **This is a personal fork, not upstream.** Branch **`feat/dual-surface-switch`** of [Fei2411/DS-Bot](https://github.com/Fei2411/DS-Bot). Its one idea: **DS Bot mode and the native DSH mode switch freely** — neither one replaces the other. This copy carries no sponsor block: it is not sponsored by anyone, it is maintained purely for the love of it.
+
 ![version](https://img.shields.io/badge/version-v0.3_preview-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.1-4D6BFE) ![license](https://img.shields.io/badge/license-Apache_2.0-green)
 
 DS Bot is an open-source project built on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH), available as a standalone desktop app or as a DSH plugin. It turns DSH into bots that you create, talk to and work with.
 
-## This fork: the native DSH surface is not lost
+## What this branch changes
 
 Upstream DS Bot takes the window over when it is installed — the bot team replaces your DSH workspace, and the way back lives in Settings. This branch keeps the **native DSH surface** instead, so neither mode is a trap:
 
@@ -17,16 +24,11 @@ Upstream DS Bot takes the window over when it is installed — the bot team repl
 - **A fresh install opens on the native surface**, so the plugin never hides your own workspace on first run. The choice is remembered once you switch.
 - **Settings stay with their own surface**: the native one keeps DSH's own Settings dialog, the bot one keeps DS Bot's.
 
-![Switch to DS Bot from the window band, or from the sidebar row](docs/images/dual-surface-switch.png)
+Published as [`ds-bot-dual-surface`](https://www.npmjs.com/package/ds-bot-dual-surface) on npm, so it installs beside upstream's `ds-bot` instead of replacing it:
 
-## Sponsors
-
-<table>
-<tr>
-<td width="180" align="center"><a href="https://modelgo.ai/?utm_source=dsbot&utm_medium=sponsorship&utm_content=readme&campaign_id=dsbot&ad_group_id=readme"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/sponsors/modelgo-dark.svg"><img src="docs/images/sponsors/modelgo.svg" alt="ModelGo" width="150"></picture></a></td>
-<td>ModelGo is a reliable, high-performance, enterprise-grade AI API aggregation platform. Access leading AI models—including Claude, OpenAI, Gemini, and DeepSeek—with a single API key. Sign up now and get 40% off DeepSeek V4.1 Flash.<br>Exclusive perks for DS-Bot users: get $0.50 in credits when you sign up, earn another $2 after your first API call, and receive up to $10 in bonus credits when you top up! Try it now: <a href="https://modelgo.ai/?utm_source=dsbot&utm_medium=sponsorship&utm_content=readme&campaign_id=dsbot&ad_group_id=readme">ModelGo Official Website</a></td>
-</tr>
-</table>
+```sh
+dsh plugin --profile desktop add ds-bot-dual-surface
+```
 
 <h2></h2>
 

@@ -1,14 +1,21 @@
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg"><img src="docs/images/logo.svg" alt="DS Bot" width="260"></picture></p>
+<table align="center">
+<tr>
+<td align="center" width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg"><img src="docs/images/logo.svg" alt="DS Bot" width="260"></picture></td>
+<td align="center" width="50%"><img src="docs/images/dual-surface-switch.png" alt="标题条上的模式滑块，以及左侧栏的 DS Bot 入口" width="260"></td>
+</tr>
+</table>
 
 # DS Bot
 
 [English](README.md) | 中文
 
+> **这是个人分支，不是上游原版。** 分支 **`feat/dual-surface-switch`**，来自 [Fei2411/DS-Bot](https://github.com/Fei2411/DS-Bot)。它只做一件事：**DS Bot 模式和原生 DSH 模式自由切换**——谁都不替代谁。这份副本撤掉了上游的赞助区：我没拿任何赞助，纯属热爱。
+
 ![版本](https://img.shields.io/badge/版本-v0.3_预览-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.1-4D6BFE) ![许可](https://img.shields.io/badge/许可-Apache_2.0-green)
 
 DS Bot 是一个基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（简称 dsh）的开源项目，提供独立桌面应用和 dsh 插件两种形态。它将 dsh 改造为 bot 形式，你可以与自己创建的 bot 交流、工作。
 
-## 这个 fork：不会丢掉原生 DSH 界面
+## 这条分支改了什么
 
 原版 DS Bot 一装上就接管整个窗口——bot 团队替换掉你的 DSH 工作区，回原生界面的入口藏在设置里。这条分支**保留原生 DSH 界面**，两种模式都不会把人困住：
 
@@ -17,16 +24,11 @@ DS Bot 是一个基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepsee
 - **首次安装直接进原生界面**，插件不会在你第一次打开时就把工作区藏起来；切换过一次后会记住选择。
 - **设置各归各的**：原生模式用 DSH 自己的设置弹窗，Bot 模式用 DS Bot 的。
 
-![从标题条或左侧栏进入 DS Bot](docs/images/dual-surface-switch.png)
+已发布为 npm 上的 [`ds-bot-dual-surface`](https://www.npmjs.com/package/ds-bot-dual-surface)，和上游的 `ds-bot` 并存，不会互相覆盖：
 
-## 赞助
-
-<table>
-<tr>
-<td width="180" align="center"><a href="https://modelgo.ai/?utm_source=dsbot&utm_medium=sponsorship&utm_content=readme&campaign_id=dsbot&ad_group_id=readme"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/sponsors/modelgo-dark.svg"><img src="docs/images/sponsors/modelgo.svg" alt="ModelGo" width="150"></picture></a></td>
-<td>ModelGo 是一个稳定、高效的企业级 AI API 聚合平台，一个 API Key 即可调用 Claude、OpenAI、Gemini、DeepSeek 等主流 AI 模型。当前注册即享 6 折 deepseek v4.1 flash。<br>另为 DS-Bot 用户提供专属福利：注册即送 $0.5 额度，完成首次 API 调用再送 $2，充值赠金最高至 $10！立即体验：<a href="https://modelgo.ai/?utm_source=dsbot&utm_medium=sponsorship&utm_content=readme&campaign_id=dsbot&ad_group_id=readme">ModelGo 官网</a></td>
-</tr>
-</table>
+```sh
+dsh plugin --profile desktop add ds-bot-dual-surface
+```
 
 <h2></h2>
 

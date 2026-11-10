@@ -13,6 +13,9 @@ import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
 
 const PLUGIN = dirname(dirname(fileURLToPath(import.meta.url)))
+// The module id the loader registers is the package name: a renamed fork (this one)
+// must not keep serving the upstream id.
+const PACKAGE_NAME = JSON.parse(readFileSync(join(PLUGIN, 'package.json'), 'utf8')).name
 const OUTPUT = join(PLUGIN, 'client.js')
 const PLATFORM_MODULES = ['react', 'react-dom', '@deepseek-ai/dsh-client-ui-primitives']
 
@@ -37,7 +40,7 @@ export async function bundleClient() {
   return [
     '// Generated from src/client by `npm run build` (scripts/build-client.mjs). Do not edit by hand.',
     'window.__ModuleLoader__.load({',
-    '  id: \'ds-bot\',',
+    `  id: ${JSON.stringify(PACKAGE_NAME)},`,
     '  factory: (require) => {',
     'const module = { exports: {} }',
     result.outputFiles[0].text.trimEnd(),
