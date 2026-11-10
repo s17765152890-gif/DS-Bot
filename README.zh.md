@@ -8,6 +8,17 @@
 
 DS Bot 是一个基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（简称 dsh）的开源项目，提供独立桌面应用和 dsh 插件两种形态。它将 dsh 改造为 bot 形式，你可以与自己创建的 bot 交流、工作。
 
+## 这个 fork：不会丢掉原生 DSH 界面
+
+原版 DS Bot 一装上就接管整个窗口——bot 团队替换掉你的 DSH 工作区，回原生界面的入口藏在设置里。这条分支**保留原生 DSH 界面**，两种模式都不会把人困住：
+
+- **标题条上多一个双向滑块**，就在 dsh 自己的视图切换旁边：`原生 DSH | DS Bot`，一键往返。它只读取 dsh 那个切换的位置，绝不修改 dsh 自己的控件。
+- **左侧栏面板列表里多一行 DS Bot**（鲸鱼图标），排在「插件」和「技能」之间。点它不是切换面板，而是进入 DS Bot。
+- **首次安装直接进原生界面**，插件不会在你第一次打开时就把工作区藏起来；切换过一次后会记住选择。
+- **设置各归各的**：原生模式用 DSH 自己的设置弹窗，Bot 模式用 DS Bot 的。
+
+![从标题条或左侧栏进入 DS Bot](docs/images/dual-surface-switch.png)
+
 ## 赞助
 
 <table>

@@ -8,6 +8,17 @@ English | [中文](README.zh.md)
 
 DS Bot is an open-source project built on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH), available as a standalone desktop app or as a DSH plugin. It turns DSH into bots that you create, talk to and work with.
 
+## This fork: the native DSH surface is not lost
+
+Upstream DS Bot takes the window over when it is installed — the bot team replaces your DSH workspace, and the way back lives in Settings. This branch keeps the **native DSH surface** instead, so neither mode is a trap:
+
+- **A switch in the window band**, beside the shell's own view switch: `原生 DSH | DS Bot`, one click either way. It only reads where the shell's switch ends; the shell's own controls are never modified.
+- **A row in the sidebar's panel list**, between Plugins and Skills, wearing the team's whale. Clicking it enters DS Bot instead of selecting a panel.
+- **A fresh install opens on the native surface**, so the plugin never hides your own workspace on first run. The choice is remembered once you switch.
+- **Settings stay with their own surface**: the native one keeps DSH's own Settings dialog, the bot one keeps DS Bot's.
+
+![Switch to DS Bot from the window band, or from the sidebar row](docs/images/dual-surface-switch.png)
+
 ## Sponsors
 
 <table>
