@@ -820,13 +820,8 @@ export function apply(ctx) {
     })
   }
   const face = () => ({ actions, hooks: { roster, ui, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, frame, sidebarPref, settingsShellHeld } })
-  // DS Bot holds the settings seat in every mode, Agent mode included: the bundle patch
-  // turns DSH's own shell off, and this one draws DSH's settings pages in DS Bot's dialog.
-  ctx.effect(() => {
-    const offStyles = installCompiledStyles(SETTINGS_SHELL_CSS, 'settings-shell')
-    settingsShell = installSettingsShell(ctx, { face, actions, ui, held: settingsShellHeld })
-    return () => { settingsShell?.dispose(); settingsShell = null; offStyles() }
-  }, 'ds-bot: settings shell')
+  // The settings shell mounts with the Bot surface (installShell), not here: in Agent
+  // mode DSH's own settings shell keeps the seat, so the native dialog stays native.
   // The queue dock's per-session verbs, supplied the way the shell's own dock
   // injects them (the session facade and the conversation service).
   const queueFace = (sessionId) => ({
@@ -1066,6 +1061,20 @@ export function apply(ctx) {
     () => installFrameWatch(frame),
     () => installFrameSync(),
     () => installTheme(),
+    // The settings seat belongs to the Bot surface: DSH's own shell (ui-settings-general)
+    // owns it in Agent mode, and this one takes it over here. A seat that cannot be taken
+    // (a shell that already declared its children) is not fatal — DS Bot's fallback
+    // dialog still draws its own pages, and the group must never come down over it.
+    () => {
+      const offStyles = installCompiledStyles(SETTINGS_SHELL_CSS, 'settings-shell')
+      try {
+        settingsShell = installSettingsShell(ctx, { face, actions, ui, held: settingsShellHeld })
+      } catch (error) {
+        console.warn('[ds-bot] settings shell', error)
+        settingsShell = null
+      }
+      return () => { settingsShell?.dispose(); settingsShell = null; offStyles() }
+    },
     () => shadow('sidebar.workspaces', { priority: BOT_PRIORITY, inject: face }, TeamSidebar),
     () => shadow('sidebar.brand.mark', { priority: BOT_PRIORITY }, BrandMark),
     () => shadow('sidebar.brand.name', { priority: BOT_PRIORITY }, BrandName),
@@ -1147,7 +1156,7 @@ export function apply(ctx) {
   ctx.effect(() => {
     const slots = ctx.slots
     const offEntry = slots.inject('sidebar.panellist', () => slots.register({
-      name: 'sidebar.panellist', id: BOT_NAV_ID, order: -100, label: () => t('DS Bot'),
+      name: 'sidebar.panellist', id: BOT_NAV_ID, order: 1, label: () => t('DS Bot'),
     }, DsBotNavIcon))
     const layout = ctx.layout
     const original = layout?.selectPanel

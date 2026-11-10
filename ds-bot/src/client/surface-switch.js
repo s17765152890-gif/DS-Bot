@@ -13,7 +13,7 @@ const BAND = 96
 // Gap between the shell's own switch and ours.
 const GAP = 10
 // Used until the first measurement lands (and if the shell's switch is not found).
-const FALLBACK_LEFT = 96
+const FALLBACK_RIGHT = 180
 const FALLBACK_TOP = 8
 // Text of the shell's own view switch, either language.
 const SHELL_LABELS = ['应用', '编辑', 'App', 'Edit']
@@ -29,6 +29,7 @@ export const SURFACE_SWITCH_CSS = `
 .bt-surface-switch-btn:hover{opacity:1}
 .bt-surface-switch-btn:active{transform:scale(.97)}
 .bt-surface-switch-btn[data-on]{background:rgba(127,127,127,.30);opacity:1;font-weight:600}
+.bt-surface-switch[data-fallback]{right:${FALLBACK_RIGHT}px}
 `
 
 const label = (mode) => (mode === 'bot' ? 'DS Bot' : language().startsWith('zh') ? '原生 DSH' : 'Native DSH')
@@ -40,15 +41,25 @@ const hint = (mode) => (mode === 'bot'
 // union of the labels: the shell may split the switch into several nodes (one per
 // label, or one wrapper holding them), and anchoring on a single node put this switch
 // over the label that came next.
+// Elements under `root`, open shadow roots included: the desktop chrome may render
+// its title band inside one, where document.querySelectorAll cannot see it.
+function* deepElements(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT)
+  for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+    yield node
+    if (node.shadowRoot !== null) yield* deepElements(node.shadowRoot)
+  }
+}
+
 function scanBand() {
   if (typeof document === 'undefined' || document.body === null) return []
   const found = new Set()
   const inBand = (rect) => rect.width > 0 && rect.height > 0 && rect.height <= TALLEST_LABEL && rect.width <= WIDEST_LABEL && rect.top >= 0 && rect.top <= BAND
-  for (const el of document.querySelectorAll('button, a, [role="button"], span, li, div')) {
+  for (const el of deepElements(document.body)) {
+    if (el.closest?.('.bt-surface-switch') != null) continue
     const text = (el.textContent ?? '').trim()
     if (text.length === 0 || text.length > LONGEST_TEXT) continue
     if (!SHELL_LABELS.some(name => text === name || text.startsWith(name))) continue
-    if (el.closest('.bt-surface-switch') !== null) continue
     if (!inBand(el.getBoundingClientRect())) continue
     found.add(el)
     // The wrapper that holds the labels is the real end of the shell's switch: its
@@ -75,7 +86,9 @@ export function installSurfaceSwitch({ surface, actions }) {
   root.setAttribute('role', 'group')
   root.dataset.dshBot = 'surface-switch'
   const buttons = new Map()
-  for (const mode of ['bot', 'agent']) {
+  // The native surface sits first, right after the shell's own switch, and the way
+  // into DS Bot follows it. The active side is whichever the window is on.
+  for (const mode of ['agent', 'bot']) {
     const button = document.createElement('button')
     button.type = 'button'
     button.className = 'bt-surface-switch-btn'
@@ -123,10 +136,17 @@ export function installSurfaceSwitch({ surface, actions }) {
     raf = 0
     const at = measure()
     const box = root.getBoundingClientRect()
-    const left = at === null ? FALLBACK_LEFT : at.left
-    const top = at === null ? FALLBACK_TOP : at.middle - box.height / 2
-    root.style.left = `${Math.round(left)}px`
-    root.style.top = `${Math.round(top)}px`
+    // The shell's switch was not found (a cold start, another chrome): sit at the far
+    // end of the band instead of guessing a left offset that would crowd its labels.
+    if (at === null) {
+      root.dataset.fallback = ''
+      root.style.left = ''
+      root.style.top = `${FALLBACK_TOP}px`
+      return
+    }
+    delete root.dataset.fallback
+    root.style.left = `${Math.round(at.left)}px`
+    root.style.top = `${Math.round(at.middle - box.height / 2)}px`
   }
   const schedule = () => { if (raf === 0) raf = requestAnimationFrame(place) }
   const reanchor = () => { band = []; schedule() }

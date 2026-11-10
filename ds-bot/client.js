@@ -22731,7 +22731,7 @@ var SETTINGS_SHELL_CSS = `
 // src/client/surface-switch.js
 var BAND = 96;
 var GAP = 10;
-var FALLBACK_LEFT = 96;
+var FALLBACK_RIGHT = 180;
 var FALLBACK_TOP = 8;
 var SHELL_LABELS = ["应用", "编辑", "App", "Edit"];
 var WIDEST_LABEL = 220;
@@ -22744,18 +22744,26 @@ var SURFACE_SWITCH_CSS = `
 .bt-surface-switch-btn:hover{opacity:1}
 .bt-surface-switch-btn:active{transform:scale(.97)}
 .bt-surface-switch-btn[data-on]{background:rgba(127,127,127,.30);opacity:1;font-weight:600}
+.bt-surface-switch[data-fallback]{right:${FALLBACK_RIGHT}px}
 `;
 var label = (mode) => mode === "bot" ? "DS Bot" : language().startsWith("zh") ? "原生 DSH" : "Native DSH";
 var hint = (mode) => mode === "bot" ? language().startsWith("zh") ? "前往 DS Bot 模式" : "Go to DS Bot" : language().startsWith("zh") ? "返回原生 DSH 模式" : "Back to native DSH";
+function* deepElements(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+  for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+    yield node;
+    if (node.shadowRoot !== null) yield* deepElements(node.shadowRoot);
+  }
+}
 function scanBand() {
   if (typeof document === "undefined" || document.body === null) return [];
   const found = /* @__PURE__ */ new Set();
   const inBand = (rect) => rect.width > 0 && rect.height > 0 && rect.height <= TALLEST_LABEL && rect.width <= WIDEST_LABEL && rect.top >= 0 && rect.top <= BAND;
-  for (const el of document.querySelectorAll('button, a, [role="button"], span, li, div')) {
+  for (const el of deepElements(document.body)) {
+    if (el.closest?.(".bt-surface-switch") != null) continue;
     const text = (el.textContent ?? "").trim();
     if (text.length === 0 || text.length > LONGEST_TEXT) continue;
     if (!SHELL_LABELS.some((name) => text === name || text.startsWith(name))) continue;
-    if (el.closest(".bt-surface-switch") !== null) continue;
     if (!inBand(el.getBoundingClientRect())) continue;
     found.add(el);
     for (let up = el.parentElement, step = 0; up !== null && step < 2; up = up.parentElement, step++) {
@@ -22775,7 +22783,7 @@ function installSurfaceSwitch({ surface, actions }) {
   root.setAttribute("role", "group");
   root.dataset.dshBot = "surface-switch";
   const buttons = /* @__PURE__ */ new Map();
-  for (const mode of ["bot", "agent"]) {
+  for (const mode of ["agent", "bot"]) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "bt-surface-switch-btn";
@@ -22817,10 +22825,15 @@ function installSurfaceSwitch({ surface, actions }) {
     raf = 0;
     const at = measure();
     const box = root.getBoundingClientRect();
-    const left = at === null ? FALLBACK_LEFT : at.left;
-    const top = at === null ? FALLBACK_TOP : at.middle - box.height / 2;
-    root.style.left = `${Math.round(left)}px`;
-    root.style.top = `${Math.round(top)}px`;
+    if (at === null) {
+      root.dataset.fallback = "";
+      root.style.left = "";
+      root.style.top = `${FALLBACK_TOP}px`;
+      return;
+    }
+    delete root.dataset.fallback;
+    root.style.left = `${Math.round(at.left)}px`;
+    root.style.top = `${Math.round(at.middle - box.height / 2)}px`;
   };
   const schedule = () => {
     if (raf === 0) raf = requestAnimationFrame(place);
@@ -29625,15 +29638,6 @@ function apply(ctx) {
     });
   }
   const face = () => ({ actions, hooks: { roster, ui: ui2, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, frame, sidebarPref, settingsShellHeld } });
-  ctx.effect(() => {
-    const offStyles = installCompiledStyles(SETTINGS_SHELL_CSS, "settings-shell");
-    settingsShell = installSettingsShell(ctx, { face, actions, ui: ui2, held: settingsShellHeld });
-    return () => {
-      settingsShell?.dispose();
-      settingsShell = null;
-      offStyles();
-    };
-  }, "ds-bot: settings shell");
   const queueFace = (sessionId) => ({
     ...face(),
     updateQueue: async (itemId, action) => await ctx.sessions.binding(sessionId)?.session?.updateQueue(itemId, action) ?? { ok: false },
@@ -29854,6 +29858,24 @@ function apply(ctx) {
     () => installFrameWatch(frame),
     () => installFrameSync(),
     () => installTheme(),
+    // The settings seat belongs to the Bot surface: DSH's own shell (ui-settings-general)
+    // owns it in Agent mode, and this one takes it over here. A seat that cannot be taken
+    // (a shell that already declared its children) is not fatal — DS Bot's fallback
+    // dialog still draws its own pages, and the group must never come down over it.
+    () => {
+      const offStyles = installCompiledStyles(SETTINGS_SHELL_CSS, "settings-shell");
+      try {
+        settingsShell = installSettingsShell(ctx, { face, actions, ui: ui2, held: settingsShellHeld });
+      } catch (error) {
+        console.warn("[ds-bot] settings shell", error);
+        settingsShell = null;
+      }
+      return () => {
+        settingsShell?.dispose();
+        settingsShell = null;
+        offStyles();
+      };
+    },
     () => shadow("sidebar.workspaces", { priority: BOT_PRIORITY, inject: face }, TeamSidebar),
     () => shadow("sidebar.brand.mark", { priority: BOT_PRIORITY }, BrandMark),
     () => shadow("sidebar.brand.name", { priority: BOT_PRIORITY }, BrandName),
@@ -29932,7 +29954,7 @@ function apply(ctx) {
     const offEntry = slots.inject("sidebar.panellist", () => slots.register({
       name: "sidebar.panellist",
       id: BOT_NAV_ID,
-      order: -100,
+      order: 1,
       label: () => t("DS Bot")
     }, DsBotNavIcon));
     const layout = ctx.layout;

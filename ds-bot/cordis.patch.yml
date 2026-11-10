@@ -18,8 +18,9 @@
     searchProvider: auto
     fetchProvider: http
 
-# DS Bot's settings shell holds the sidebar's settings seat (src/client/settings-shell.js)
-# and draws DSH's settings pages in DS Bot's Settings dialog. Only the entry that declares
-# the seat's child slots may render them, so DSH's own shell stays off.
-- id: ui-settings-general
-  disabled: true
+# Fork choice: DSH's own settings shell stays mounted, so the native surface keeps its
+# own Settings dialog (ui-settings-general). DS Bot's settings shell now mounts only
+# inside the Bot surface (src/client/index.js, installShell) and takes the seat there;
+# the seat has one owner, so whichever shell is mounted owns the dialog.
+# Turning this row off (disabled: true) restores the upstream behaviour: DS Bot's shell
+# holds the seat in both surfaces.
