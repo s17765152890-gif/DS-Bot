@@ -1222,6 +1222,12 @@ export function BrandMark({ size = 24 }) {
 // The panel list's entry glyph: the Main Bot's whale, as a bare svg. The shell's icon
 // cell measures the element it is given, so a wrapper here would widen the row and
 // push the label over; the mask id is per mount because two rows would share it.
+//
+// The markup paints with `var(--bt-ink-<name>)`, and those variables live in DS Bot's
+// own stylesheets — which Agent mode withdraws. Without them the fill falls back to
+// the SVG default (black), so the row went black in the native surface. The glyph is
+// the only DS Bot ink in that surface: bind the variable to `currentColor` here, and
+// the whale takes the sidebar's own text colour, which follows the theme.
 let navMarkSerial = 0
 export function DsBotNavIcon({ size = 16 }) {
   const box = shapeOf(MAIN_LOOK.shape).size
@@ -1232,6 +1238,7 @@ export function DsBotNavIcon({ size = 16 }) {
     viewBox: `0 0 ${box} ${box}`,
     'aria-hidden': true,
     focusable: 'false',
+    style: { '--bt-ink-deepseek': 'currentColor' },
     dangerouslySetInnerHTML: { __html: characterMarkup(MAIN_LOOK.shape, MAIN_LOOK.color).replaceAll(MASK_ID, mask) },
   })
 }

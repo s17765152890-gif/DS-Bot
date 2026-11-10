@@ -16560,6 +16560,7 @@ function DsBotNavIcon({ size = 16 }) {
     viewBox: `0 0 ${box} ${box}`,
     "aria-hidden": true,
     focusable: "false",
+    style: { "--bt-ink-deepseek": "currentColor" },
     dangerouslySetInnerHTML: { __html: characterMarkup(MAIN_LOOK.shape, MAIN_LOOK.color).replaceAll(MASK_ID, mask) }
   });
 }
