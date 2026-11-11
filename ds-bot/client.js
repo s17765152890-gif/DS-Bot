@@ -5100,10 +5100,10 @@ function GoalPanel({ goal, view, room: room2, roster, actions, working }) {
     const box = stepper.current;
     if (box === null || typeof ResizeObserver !== "function") return void 0;
     const min = view.stages.length >= 10 ? 17 : 14;
-    const measure = () => box.querySelectorAll(".bt-goal-step").forEach((node) => node.classList.toggle("bt-goal-mini", node.clientWidth < min));
-    const observer = new ResizeObserver(measure);
+    const measure2 = () => box.querySelectorAll(".bt-goal-step").forEach((node) => node.classList.toggle("bt-goal-mini", node.clientWidth < min));
+    const observer = new ResizeObserver(measure2);
     observer.observe(box);
-    measure();
+    measure2();
     return () => observer.disconnect();
   }, [view.stages.length]);
   const control = (action) => void Promise.resolve(actions.goalControl(room2.id, goal.id, action)).catch((error) => actions.reportError(error, "goal"));
@@ -7485,12 +7485,12 @@ function useWidth(box, initial) {
   (0, import_react13.useLayoutEffect)(() => {
     const node = box.current;
     if (!node || typeof ResizeObserver !== "function") return void 0;
-    const measure = () => {
+    const measure2 = () => {
       const next = Math.round(node.clientWidth);
       if (next > 0) setWidth(next);
     };
-    measure();
-    const observer = new ResizeObserver(measure);
+    measure2();
+    const observer = new ResizeObserver(measure2);
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
@@ -13993,7 +13993,7 @@ function ThinkingRow({ text, live, at, ms, viewKey }) {
   const remember = (patch) => {
     if (viewKey !== void 0) rowViews.set(viewKey, { ...rowViews.get(viewKey), ...patch });
   };
-  const measure = () => {
+  const measure2 = () => {
     const el = box.current;
     atEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 2;
     remember({ atEnd: atEnd.current, top: el.scrollTop });
@@ -14013,7 +14013,7 @@ function ThinkingRow({ text, live, at, ms, viewKey }) {
     view.current = void 0;
     if (atEnd.current) el.scrollTop = el.scrollHeight;
     else if (restore?.top !== void 0) el.scrollTop = restore.top;
-    measure();
+    measure2();
   }, [text, open]);
   const title = live ? t("Thinking") : t("Thought it through");
   return (0, import_react32.createElement)(
@@ -14026,7 +14026,7 @@ function ThinkingRow({ text, live, at, ms, viewKey }) {
       live && at !== void 0 ? (0, import_react32.createElement)(Elapsed, { at, className: "bt-think-time" }) : null,
       !live && ms !== void 0 ? (0, import_react32.createElement)("span", { className: "bt-think-time" }, `· ${elapsedLabel(Math.max(1e3, ms))}`) : null
     ),
-    (0, import_react32.createElement)("div", { ref: box, className: "bt-think-text", role: "region", "aria-label": title, tabIndex: 0, "data-fade": fade, onScroll: measure }, text)
+    (0, import_react32.createElement)("div", { ref: box, className: "bt-think-text", role: "region", "aria-label": title, tabIndex: 0, "data-fade": fade, onScroll: measure2 }, text)
   );
 }
 function useFileMentions({ node, openFile, fileMentions, useTurnData }) {
@@ -15221,7 +15221,7 @@ function installFrameWatch(frame) {
       return state.viewport === next.viewport && state.collapsedWidth === next.collapsedWidth && state.collapsed === next.collapsed ? state : next;
     });
   };
-  const measure = () => {
+  const measure2 = () => {
     for (const selector of ['[class*="_sidebarCol"]', '[class*="_centerCol"]']) {
       for (const column of document.querySelectorAll(selector)) {
         if (!watched.has(column)) {
@@ -15235,10 +15235,10 @@ function installFrameWatch(frame) {
   const schedule = () => {
     if (raf === 0) raf = requestAnimationFrame(() => {
       raf = 0;
-      measure();
+      measure2();
     });
   };
-  measure();
+  measure2();
   const mutations = new MutationObserver(schedule);
   mutations.observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-sidebar-collapsed", "data-animating"] });
   window.addEventListener("resize", schedule);
@@ -22730,22 +22730,23 @@ var SETTINGS_SHELL_CSS = `
 `;
 
 // src/client/surface-switch.js
-var BAND = 96;
+var MENU_HOST = "[data-windows-menu]";
+var DEFAULT_LEFT = 96;
+var DEFAULT_TOP = 8;
 var GAP = 10;
-var FALLBACK_RIGHT = 180;
-var FALLBACK_TOP = 8;
+var BAND = 96;
 var SHELL_LABELS = ["应用", "编辑", "App", "Edit"];
 var WIDEST_LABEL = 220;
 var TALLEST_LABEL = 48;
 var LONGEST_TEXT = 12;
-var EMPTY_RESCAN_MS = 300;
+var TICK_MS = 1e3;
 var SURFACE_SWITCH_CSS = `
 .bt-surface-switch{position:fixed;z-index:60;display:inline-flex;align-items:center;gap:2px;padding:2px;border-radius:999px;background:rgba(127,127,127,.16);-webkit-app-region:no-drag;font-family:inherit;font-size:12px;line-height:16px;color:inherit;user-select:none;pointer-events:auto}
+.bt-surface-switch[data-hidden]{display:none}
 .bt-surface-switch-btn{border:0;margin:0;padding:3px 10px;border-radius:999px;background:none;color:inherit;font:inherit;font-size:12px;line-height:16px;cursor:pointer;opacity:.7;white-space:nowrap;transition:background-color .12s ease,opacity .12s ease}
 .bt-surface-switch-btn:hover{opacity:1}
 .bt-surface-switch-btn:active{transform:scale(.97)}
 .bt-surface-switch-btn[data-on]{background:rgba(127,127,127,.30);opacity:1;font-weight:600}
-.bt-surface-switch[data-fallback]{right:${FALLBACK_RIGHT}px}
 `;
 var label = (mode) => mode === "bot" ? "DS Bot" : language().startsWith("zh") ? "原生 DSH" : "Native DSH";
 var hint = (mode) => mode === "bot" ? language().startsWith("zh") ? "前往 DS Bot 模式" : "Go to DS Bot" : language().startsWith("zh") ? "返回原生 DSH 模式" : "Back to native DSH";
@@ -22756,7 +22757,7 @@ function* deepElements(root) {
     if (node.shadowRoot !== null) yield* deepElements(node.shadowRoot);
   }
 }
-function scanBand() {
+function scanLabels() {
   if (typeof document === "undefined" || document.body === null) return [];
   const found = /* @__PURE__ */ new Set();
   const inBand = (rect) => rect.width > 0 && rect.height > 0 && rect.height <= TALLEST_LABEL && rect.width <= WIDEST_LABEL && rect.top >= 0 && rect.top <= BAND;
@@ -22767,16 +22768,34 @@ function scanBand() {
     if (!SHELL_LABELS.some((name) => text === name || text.startsWith(name))) continue;
     if (!inBand(el.getBoundingClientRect())) continue;
     found.add(el);
-    for (let up = el.parentElement, step = 0; up !== null && step < 2; up = up.parentElement, step++) {
-      const wrapperText = (up.textContent ?? "").trim();
-      if (wrapperText.length === 0 || wrapperText.length > LONGEST_TEXT) break;
-      const rest = SHELL_LABELS.reduce((text2, name) => text2.split(name).join(""), wrapperText).replace(/\s/g, "");
-      if (rest.length > 0) break;
-      if (up.closest(".bt-surface-switch") !== null) break;
-      if (inBand(up.getBoundingClientRect())) found.add(up);
-    }
   }
   return [...found];
+}
+var hostEl = null;
+function menuHost() {
+  if (hostEl !== null && hostEl.isConnected) return hostEl;
+  hostEl = typeof document === "undefined" ? null : document.querySelector(MENU_HOST);
+  return hostEl;
+}
+function measure() {
+  if (typeof document === "undefined") return null;
+  const host = menuHost();
+  if (host !== null) {
+    const rect = host.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return { hidden: true };
+    return { left: rect.right + GAP, middle: rect.top + rect.height / 2 };
+  }
+  let right = null;
+  let top = null;
+  let bottom = null;
+  for (const el of scanLabels()) {
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) continue;
+    right = right === null ? rect.right : Math.max(right, rect.right);
+    top = top === null ? rect.top : Math.min(top, rect.top);
+    bottom = bottom === null ? rect.bottom : Math.max(bottom, rect.bottom);
+  }
+  return right === null ? null : { left: right + GAP, middle: (top + bottom) / 2 };
 }
 function installSurfaceSwitch({ surface, actions }) {
   const root = document.createElement("div");
@@ -22798,50 +22817,32 @@ function installSurfaceSwitch({ surface, actions }) {
     buttons.set(mode, button);
   }
   document.body.appendChild(root);
-  let band = [];
-  let scannedAt = 0;
-  let raf = 0;
-  const measure = () => {
-    const connected = band.length > 0 && band.every((el) => el.isConnected);
-    if (!connected) {
-      const now = Date.now();
-      if (band.length > 0 || now - scannedAt >= EMPTY_RESCAN_MS) {
-        band = scanBand();
-        scannedAt = now;
-      }
-    }
-    let right = null;
-    let top = null;
-    let bottom = null;
-    for (const el of band) {
-      const rect = el.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) continue;
-      right = right === null ? rect.right : Math.max(right, rect.right);
-      top = top === null ? rect.top : Math.min(top, rect.top);
-      bottom = bottom === null ? rect.bottom : Math.max(bottom, rect.bottom);
-    }
-    return right === null ? null : { left: right + GAP, middle: (top + bottom) / 2 };
-  };
+  let placed = null;
   const place = () => {
-    raf = 0;
     const at = measure();
-    const box = root.getBoundingClientRect();
-    if (at === null) {
-      root.dataset.fallback = "";
-      root.style.left = "";
-      root.style.top = `${FALLBACK_TOP}px`;
+    if (at === null) return;
+    if (at.hidden === true) {
+      root.dataset.hidden = "";
       return;
     }
-    delete root.dataset.fallback;
-    root.style.left = `${Math.round(at.left)}px`;
-    root.style.top = `${Math.round(at.middle - box.height / 2)}px`;
+    delete root.dataset.hidden;
+    const box = root.getBoundingClientRect();
+    const left = Math.round(at.left);
+    const top = Math.round(at.middle - box.height / 2);
+    if (placed !== null && placed.left === left && placed.top === top) return;
+    placed = { left, top };
+    root.style.left = `${left}px`;
+    root.style.top = `${top}px`;
   };
+  root.dataset.hidden = "";
+  root.style.left = `${DEFAULT_LEFT}px`;
+  root.style.top = `${DEFAULT_TOP}px`;
+  let raf = 0;
   const schedule = () => {
-    if (raf === 0) raf = requestAnimationFrame(place);
-  };
-  const reanchor = () => {
-    band = [];
-    schedule();
+    if (raf === 0) raf = requestAnimationFrame(() => {
+      raf = 0;
+      place();
+    });
   };
   const paint = () => {
     const mode = surface.getSnapshot().mode;
@@ -22858,15 +22859,32 @@ function installSurfaceSwitch({ surface, actions }) {
   };
   const offSurface = surface.subscribe(paint);
   paint();
-  const observer = new MutationObserver(() => schedule());
-  observer.observe(document.documentElement, { childList: true, subtree: true, attributeFilter: ["data-sidebar-collapsed", "data-fullscreen", "data-platform", "data-windows-titlebar"] });
-  window.addEventListener("resize", reanchor);
-  const timers = [0, 60, 200, 600, 1500].map((delay) => setTimeout(reanchor, delay));
+  const observer = new MutationObserver(schedule);
+  observer.observe(document.documentElement, { childList: true, subtree: true, attributeFilter: ["data-fullscreen", "data-platform", "data-windows-titlebar", "lang"] });
+  window.addEventListener("resize", schedule);
+  const resizes = typeof ResizeObserver === "function" ? new ResizeObserver(schedule) : null;
+  const watchBand = () => {
+    const host = menuHost();
+    if (host !== null && resizes !== null) {
+      try {
+        resizes.observe(host);
+      } catch {
+      }
+    }
+  };
+  watchBand();
+  const tick = setInterval(() => {
+    watchBand();
+    place();
+  }, TICK_MS);
+  const first = [0, 60, 200, 600, 1500].map((delay) => setTimeout(schedule, delay));
   return () => {
     offSurface();
     observer.disconnect();
-    window.removeEventListener("resize", reanchor);
-    for (const timer of timers) clearTimeout(timer);
+    window.removeEventListener("resize", schedule);
+    resizes?.disconnect();
+    clearInterval(tick);
+    for (const timer of first) clearTimeout(timer);
     if (raf !== 0) cancelAnimationFrame(raf);
     root.remove();
   };
@@ -23004,7 +23022,7 @@ function useTranscriptView() {
     let frame = 0;
     let watched = null;
     const observer = new MutationObserver(() => schedule());
-    const measure = () => {
+    const measure2 = () => {
       frame = 0;
       const scroller = document.querySelector("[data-conversation-scroll]");
       if (scroller !== watched) {
@@ -23035,7 +23053,7 @@ function useTranscriptView() {
       setView((prev) => prev && Object.keys(next).every((key) => prev[key] === next[key]) ? prev : next);
     };
     const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(measure);
+      if (!frame) frame = requestAnimationFrame(measure2);
     };
     document.addEventListener("scroll", schedule, true);
     window.addEventListener("resize", schedule);
@@ -26546,17 +26564,17 @@ function BrowserView({ bot, tabId, leaving, landed, actions, useBrowserPages, ho
       return void 0;
     }
     let raf = 0;
-    const measure = () => {
+    const measure2 = () => {
       cancelAnimationFrame(raf);
       raf = 0;
       const box = element.getBoundingClientRect();
       void actions.browserShow(tabId, showGuest ? { left: box.left, top: box.top, width: box.width, height: box.height } : null);
     };
     const schedule = () => {
-      if (!raf) raf = requestAnimationFrame(measure);
+      if (!raf) raf = requestAnimationFrame(measure2);
     };
-    measure();
-    const observer = new ResizeObserver(measure);
+    measure2();
+    const observer = new ResizeObserver(measure2);
     observer.observe(element);
     window.addEventListener("resize", schedule);
     return () => {
