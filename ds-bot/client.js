@@ -29317,13 +29317,21 @@ function apply(ctx) {
     } catch {
     }
   };
-  const restoreSurface = (mode) => {
-    const last = surfaceSessions[mode];
-    if (last === void 0 || last === mainView()) return last !== void 0;
-    if (ctx.sessions.list.getSnapshot().byId?.[last] === void 0) return false;
-    if (mode === "agent" ? !isAgentSessionId(last) : isAgentSessionId(last)) return false;
+  const isBotChat = (id) => {
+    const snapshot = roster.getSnapshot();
+    return snapshot.byId?.[id] !== void 0 || snapshot.roomsById?.[id] !== void 0;
+  };
+  const landOn = (mode, last) => {
     if (mode === "agent") actions.openAgentSession(last);
     else actions.openSession(last);
+  };
+  const restoreSurface = (mode) => {
+    const last = surfaceSessions[mode];
+    if (last === void 0) return false;
+    if (last === mainView()) return true;
+    if (ctx.sessions.list.getSnapshot().byId?.[last] === void 0) return false;
+    if (mode === "agent" ? isBotChat(last) : !isBotChat(last)) return false;
+    landOn(mode, last);
     return true;
   };
   const actions = {
@@ -29445,11 +29453,19 @@ function apply(ctx) {
       writeMode(mode);
       surface.set((state) => ({ ...state, mode }));
       if (mode === "agent" && window.innerWidth >= DSH_NARROW && frame.getSnapshot().collapsed) ctx.layout.toggleSidebar();
+      const other = mode === "agent" ? "bot" : "agent";
       setTimeout(() => {
         if (surface.getSnapshot().mode !== mode) return;
         if (restoreSurface(mode)) return;
         if (mode === "bot") ensureBotHome();
       }, 0);
+      setTimeout(() => {
+        if (surface.getSnapshot().mode !== mode) return;
+        const target = surfaceSessions[mode];
+        if (target === void 0 || mainView() === target) return;
+        if (surfaceSessions[other] !== void 0 && mainView() !== surfaceSessions[other]) return;
+        landOn(mode, target);
+      }, 250);
     },
     markUnread: (id) => writeUnread(id, true),
     beginVisit: (id) => {

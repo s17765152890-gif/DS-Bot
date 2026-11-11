@@ -489,13 +489,26 @@ export function apply(ctx) {
   // Returns true when the surface was put back where it was. A remembered session that
   // is gone, or that belongs to the other surface, is not restored: the caller then
   // falls back to its own landing (the Bot home).
-  const restoreSurface = (mode) => {
-    const last = surfaceSessions[mode]
-    if (last === undefined || last === mainView()) return last !== undefined
-    if (ctx.sessions.list.getSnapshot().byId?.[last] === undefined) return false
-    if (mode === 'agent' ? !isAgentSessionId(last) : isAgentSessionId(last)) return false
+  //
+  // "Belongs to the other surface" is decided by the team roster, not by
+  // `isAgentSessionId`: that predicate only knows the DSH Agent Sessions DS Bot adopted,
+  // so a plain native session — the user's own workspace session — would look like a Bot
+  // conversation and never be restored.
+  const isBotChat = (id) => {
+    const snapshot = roster.getSnapshot()
+    return snapshot.byId?.[id] !== undefined || snapshot.roomsById?.[id] !== undefined
+  }
+  const landOn = (mode, last) => {
     if (mode === 'agent') actions.openAgentSession(last)
     else actions.openSession(last)
+  }
+  const restoreSurface = (mode) => {
+    const last = surfaceSessions[mode]
+    if (last === undefined) return false
+    if (last === mainView()) return true
+    if (ctx.sessions.list.getSnapshot().byId?.[last] === undefined) return false
+    if (mode === 'agent' ? isBotChat(last) : !isBotChat(last)) return false
+    landOn(mode, last)
     return true
   }
   const actions = {
@@ -621,11 +634,22 @@ export function apply(ctx) {
       if (mode === 'agent' && window.innerWidth >= DSH_NARROW && frame.getSnapshot().collapsed) ctx.layout.toggleSidebar()
       // Land on the conversation this surface was on. Deferred by a tick: opening it
       // before the surface change renders lets the plain-session sync undo the jump.
+      const other = mode === 'agent' ? 'bot' : 'agent'
       setTimeout(() => {
         if (surface.getSnapshot().mode !== mode) return
         if (restoreSurface(mode)) return
         if (mode === 'bot') ensureBotHome()
       }, 0)
+      // A late surface reconcile can still move the main view back to the other
+      // surface's conversation. If the view is still on that conversation a beat later,
+      // land once more — but never fight a navigation the user made in the meantime.
+      setTimeout(() => {
+        if (surface.getSnapshot().mode !== mode) return
+        const target = surfaceSessions[mode]
+        if (target === undefined || mainView() === target) return
+        if (surfaceSessions[other] !== undefined && mainView() !== surfaceSessions[other]) return
+        landOn(mode, target)
+      }, 250)
     },
     markUnread: id => writeUnread(id, true),
     beginVisit: (id) => {
