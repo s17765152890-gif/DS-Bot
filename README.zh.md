@@ -9,7 +9,7 @@
 
 [English](README.md) | 中文
 
-> **这是个人分支，不是上游原版。** 分支 **`feat/dual-surface-switch`**，来自 [Fei2411/DS-Bot](https://github.com/Fei2411/DS-Bot)。它只做一件事：**DS Bot 模式和原生 DSH 模式自由切换**——谁都不替代谁。这份副本撤掉了上游的赞助区：我没拿任何赞助，纯属热爱。
+> **这是个人分支，不是上游原版。** 分支 **`feat/dual-surface-switch`**，来自 [Fei2411/DS-Bot](https://github.com/Fei2411/DS-Bot)。它只做一件事：**DS Bot 模式和原生 DSH 模式自由切换**——谁都不替代谁。
 
 ![版本](https://img.shields.io/badge/版本-v0.3_预览-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.1-4D6BFE) ![许可](https://img.shields.io/badge/许可-Apache_2.0-green)
 

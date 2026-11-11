@@ -9,7 +9,7 @@
 
 English | [中文](README.zh.md)
 
-> **This is a personal fork, not upstream.** Branch **`feat/dual-surface-switch`** of [Fei2411/DS-Bot](https://github.com/Fei2411/DS-Bot). Its one idea: **DS Bot mode and the native DSH mode switch freely** — neither one replaces the other. This copy carries no sponsor block: it is not sponsored by anyone, it is maintained purely for the love of it.
+> **This is a personal fork, not upstream.** Branch **`feat/dual-surface-switch`** of [Fei2411/DS-Bot](https://github.com/Fei2411/DS-Bot). Its one idea: **DS Bot mode and the native DSH mode switch freely** — neither one replaces the other.
 
 ![version](https://img.shields.io/badge/version-v0.3_preview-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.1-4D6BFE) ![license](https://img.shields.io/badge/license-Apache_2.0-green)
 
