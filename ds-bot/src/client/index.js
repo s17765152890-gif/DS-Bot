@@ -472,6 +472,32 @@ export function apply(ctx) {
       })
     }
   }
+  // Each surface keeps the conversation it was on. A mode switch is not a navigation:
+  // leaving the native surface to do something in the Bot surface and coming back must
+  // land on the same session, and the same holds the other way round. The ids are kept
+  // in localStorage as well, so a reload in the middle of one surface still remembers
+  // where the other one was.
+  const SURFACE_SESSIONS = 'ds-bot:surface-sessions'
+  let surfaceSessions = {}
+  try { surfaceSessions = JSON.parse(localStorage.getItem(SURFACE_SESSIONS) ?? '{}') ?? {} } catch { surfaceSessions = {} }
+  const rememberSurface = (mode) => {
+    const current = mainView()
+    if (current === undefined || surfaceSessions[mode] === current) return
+    surfaceSessions = { ...surfaceSessions, [mode]: current }
+    try { localStorage.setItem(SURFACE_SESSIONS, JSON.stringify(surfaceSessions)) } catch { /* storage unavailable */ }
+  }
+  // Returns true when the surface was put back where it was. A remembered session that
+  // is gone, or that belongs to the other surface, is not restored: the caller then
+  // falls back to its own landing (the Bot home).
+  const restoreSurface = (mode) => {
+    const last = surfaceSessions[mode]
+    if (last === undefined || last === mainView()) return last !== undefined
+    if (ctx.sessions.list.getSnapshot().byId?.[last] === undefined) return false
+    if (mode === 'agent' ? !isAgentSessionId(last) : isAgentSessionId(last)) return false
+    if (mode === 'agent') actions.openAgentSession(last)
+    else actions.openSession(last)
+    return true
+  }
   const actions = {
     ...teamActions({ call, after, partFor, roster, ui, live, cards, heldCards, turnClock, panelFolded }),
     learningAnswer: (id, approve) => after(call('learning-answer', { id, approve })),
@@ -583,6 +609,8 @@ export function apply(ctx) {
         if (mode === 'bot') ensureBotHome()
         return
       }
+      // Remember where this surface was before the other one takes the main view.
+      rememberSurface(surface.getSnapshot().mode)
       if (mode === 'agent') {
         ui.set(state => ({ ...state, details: null, view: 'details', settings: null, palette: null, newChat: null, menu: null, voice: null, exchange: null, memory: null, toast: null }))
       }
@@ -591,8 +619,13 @@ export function apply(ctx) {
       // The Bot view kept the shell's sidebar collapsed under its own column; the
       // shell's own view gets it back (below DSH_NARROW the shell decides itself).
       if (mode === 'agent' && window.innerWidth >= DSH_NARROW && frame.getSnapshot().collapsed) ctx.layout.toggleSidebar()
-      if (mode !== 'bot') return
-      ensureBotHome()
+      // Land on the conversation this surface was on. Deferred by a tick: opening it
+      // before the surface change renders lets the plain-session sync undo the jump.
+      setTimeout(() => {
+        if (surface.getSnapshot().mode !== mode) return
+        if (restoreSurface(mode)) return
+        if (mode === 'bot') ensureBotHome()
+      }, 0)
     },
     markUnread: id => writeUnread(id, true),
     beginVisit: (id) => {

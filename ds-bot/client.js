@@ -29301,6 +29301,31 @@ function apply(ctx) {
       });
     }
   };
+  const SURFACE_SESSIONS = "ds-bot:surface-sessions";
+  let surfaceSessions = {};
+  try {
+    surfaceSessions = JSON.parse(localStorage.getItem(SURFACE_SESSIONS) ?? "{}") ?? {};
+  } catch {
+    surfaceSessions = {};
+  }
+  const rememberSurface = (mode) => {
+    const current = mainView();
+    if (current === void 0 || surfaceSessions[mode] === current) return;
+    surfaceSessions = { ...surfaceSessions, [mode]: current };
+    try {
+      localStorage.setItem(SURFACE_SESSIONS, JSON.stringify(surfaceSessions));
+    } catch {
+    }
+  };
+  const restoreSurface = (mode) => {
+    const last = surfaceSessions[mode];
+    if (last === void 0 || last === mainView()) return last !== void 0;
+    if (ctx.sessions.list.getSnapshot().byId?.[last] === void 0) return false;
+    if (mode === "agent" ? !isAgentSessionId(last) : isAgentSessionId(last)) return false;
+    if (mode === "agent") actions.openAgentSession(last);
+    else actions.openSession(last);
+    return true;
+  };
   const actions = {
     ...teamActions({ call, after, partFor, roster, ui: ui2, live, cards, heldCards, turnClock, panelFolded }),
     learningAnswer: (id, approve) => after(call("learning-answer", { id, approve })),
@@ -29413,14 +29438,18 @@ function apply(ctx) {
         if (mode === "bot") ensureBotHome();
         return;
       }
+      rememberSurface(surface.getSnapshot().mode);
       if (mode === "agent") {
         ui2.set((state) => ({ ...state, details: null, view: "details", settings: null, palette: null, newChat: null, menu: null, voice: null, exchange: null, memory: null, toast: null }));
       }
       writeMode(mode);
       surface.set((state) => ({ ...state, mode }));
       if (mode === "agent" && window.innerWidth >= DSH_NARROW && frame.getSnapshot().collapsed) ctx.layout.toggleSidebar();
-      if (mode !== "bot") return;
-      ensureBotHome();
+      setTimeout(() => {
+        if (surface.getSnapshot().mode !== mode) return;
+        if (restoreSurface(mode)) return;
+        if (mode === "bot") ensureBotHome();
+      }, 0);
     },
     markUnread: (id) => writeUnread(id, true),
     beginVisit: (id) => {
