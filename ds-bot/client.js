@@ -22893,6 +22893,7 @@ function installSurfaceSwitch({ surface, actions }) {
 // src/client/memory-tab.js
 var import_react49 = require("react");
 var MEMORY_TAB_ID = "ds-bot-memory";
+var ENTRIES_SHOWN = 6;
 var zh = () => language().startsWith("zh");
 var say = (zhText, enText) => zh() ? zhText : enText;
 var MEMORY_TAB_CSS = `
@@ -22924,6 +22925,14 @@ var MEMORY_TAB_CSS = `
 .bt-mem-source-bot{font-size:11px;opacity:.55}
 .bt-mem-link{min-height:24px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary,inherit);font:inherit;font-size:11px;cursor:pointer;white-space:nowrap}
 .bt-mem-link:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.18));color:inherit}
+.bt-mem-group{display:flex;flex-direction:column;gap:4px}
+.bt-mem-group-head{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
+.bt-mem-count{font-size:11px;font-weight:400;opacity:.55}
+.bt-mem-entry{display:flex;align-items:flex-start;gap:6px;padding:5px 8px;border-radius:8px;background:var(--dsw-alias-bg-layer-1,rgba(127,127,127,.05));font-size:12px;line-height:1.45}
+.bt-mem-entry-text{flex:1;min-width:0;overflow-wrap:anywhere}
+.bt-mem-entry-src{flex:none;font-size:10px;opacity:.6}
+.bt-mem-more{align-self:flex-start;min-height:22px;padding:0 8px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary,inherit);font:inherit;font-size:11px;cursor:pointer}
+.bt-mem-more:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.18))}
 `;
 var avatarSerial = 0;
 function BotAvatar2({ look, size = 40 }) {
@@ -22941,6 +22950,7 @@ function BotAvatar2({ look, size = 40 }) {
   });
 }
 var lookOfBot = (bot) => ({ shape: bot?.avatar?.shape ?? "whale", color: bot?.color ?? "deepseek" });
+var sessionOf = (source) => typeof source === "string" && source.startsWith("session:") ? source.slice("session:".length).split(" ")[0] : null;
 function MemoryTabTitle() {
   return (0, import_react49.createElement)(
     "span",
@@ -22957,6 +22967,8 @@ function MemoryTabBody(props) {
   const [result, setResult] = (0, import_react49.useState)(null);
   const [error, setError] = (0, import_react49.useState)("");
   const [sources, setSources] = (0, import_react49.useState)({});
+  const [memories, setMemories] = (0, import_react49.useState)({});
+  const [shown, setShown] = (0, import_react49.useState)({});
   const bots = roster?.bots ?? [];
   const refreshSources = async () => {
     try {
@@ -22964,9 +22976,22 @@ function MemoryTabBody(props) {
     } catch {
     }
   };
+  const refreshMemories = async () => {
+    const next = {};
+    await Promise.all(bots.map(async (bot) => {
+      try {
+        const view = await call("memory-view", { botId: bot.id });
+        next[bot.id] = Array.isArray(view?.entries) ? view.entries : [];
+      } catch {
+        next[bot.id] = [];
+      }
+    }));
+    setMemories(next);
+  };
   (0, import_react49.useEffect)(() => {
     void refreshSources();
-  }, []);
+    void refreshMemories();
+  }, [bots.length]);
   const learn = async (botId, sessionId) => {
     setBusy(botId);
     setError("");
@@ -22981,6 +23006,7 @@ function MemoryTabBody(props) {
         suggestion: value?.suggestion ?? null
       });
       void refreshSources();
+      void refreshMemories();
     } catch (failure) {
       setError(String(failure?.message ?? failure));
     } finally {
@@ -23010,6 +23036,12 @@ function MemoryTabBody(props) {
   };
   const nameOf2 = (botId) => bots.find((bot) => bot.id === botId)?.name ?? botId;
   const rows2 = Object.entries(sources).flatMap(([botId, list]) => (Array.isArray(list) ? list : []).map((row) => ({ botId, ...row }))).sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
+  const openSession = (sessionId) => {
+    try {
+      props.actions.show(sessionId);
+    } catch {
+    }
+  };
   const cards = useRoster === null ? null : bots.length === 0 ? (0, import_react49.createElement)("div", { className: "bt-mem-empty" }, say("团队还没有 Bot。", "The team has no Bots yet.")) : (0, import_react49.createElement)("div", { className: "bt-mem-grid" }, bots.map((bot) => (0, import_react49.createElement)(
     "div",
     {
@@ -23064,12 +23096,7 @@ function MemoryTabBody(props) {
         type: "button",
         className: "bt-mem-link",
         title: say("回到这条会话", "Open the original session"),
-        onClick: () => {
-          try {
-            props.actions.show(row.sessionId);
-          } catch {
-          }
-        }
+        onClick: () => openSession(row.sessionId)
       }, say("跳转", "Open")),
       (0, import_react49.createElement)("button", {
         type: "button",
@@ -23081,6 +23108,46 @@ function MemoryTabBody(props) {
         }
       }, say("再学", "Relearn"))
     ))
+  );
+  const remembered = bots.length === 0 ? null : (0, import_react49.createElement)(
+    "div",
+    { className: "bt-mem-sources" },
+    (0, import_react49.createElement)("div", { className: "bt-mem-title" }, say("它们记得什么", "What they remember")),
+    bots.map((bot) => {
+      const entries2 = memories[bot.id] ?? [];
+      if (entries2.length === 0) return null;
+      const all = shown[bot.id] === true;
+      const visible = all ? entries2 : entries2.slice(0, ENTRIES_SHOWN);
+      return (0, import_react49.createElement)(
+        "div",
+        { key: bot.id, className: "bt-mem-group" },
+        (0, import_react49.createElement)(
+          "div",
+          { className: "bt-mem-group-head" },
+          (0, import_react49.createElement)("span", null, bot.name),
+          (0, import_react49.createElement)("span", { className: "bt-mem-count" }, `${entries2.length}`)
+        ),
+        visible.map((entry) => {
+          const sessionId = sessionOf(entry.source);
+          return (0, import_react49.createElement)(
+            "div",
+            { key: `${bot.id}:${entry.text}`, className: "bt-mem-entry" },
+            (0, import_react49.createElement)("span", { className: "bt-mem-entry-text" }, entry.text),
+            sessionId === null ? null : (0, import_react49.createElement)("button", {
+              type: "button",
+              className: "bt-mem-link bt-mem-entry-src",
+              title: say("来自这条会话，点开看看", "From this Session — open it"),
+              onClick: () => openSession(sessionId)
+            }, say("来源", "source"))
+          );
+        }),
+        entries2.length > ENTRIES_SHOWN ? (0, import_react49.createElement)("button", {
+          type: "button",
+          className: "bt-mem-more",
+          onClick: () => setShown((state) => ({ ...state, [bot.id]: !all }))
+        }, all ? say("收起", "Show less") : say(`显示全部 ${entries2.length} 条`, `Show all ${entries2.length}`)) : null
+      );
+    })
   );
   return (0, import_react49.createElement)(
     "div",
@@ -23096,7 +23163,8 @@ function MemoryTabBody(props) {
     busy !== null ? (0, import_react49.createElement)("div", { className: "bt-mem-note" }, say("正在读这个会话…", "Reading the session…")) : null,
     error !== "" ? (0, import_react49.createElement)("div", { className: "bt-mem-error" }, error) : null,
     suggestion,
-    learned
+    learned,
+    remembered
   );
 }
 

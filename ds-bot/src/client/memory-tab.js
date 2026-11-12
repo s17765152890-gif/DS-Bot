@@ -1,8 +1,9 @@
 // The memory tab: a right-sidebar tab that shows the team's Bots as their own
-// characters. A native Session dragged from the left sidebar onto a Bot is read into
-// that Bot's memory — the Session itself stays where it was, this only reads it — and
-// the Bot's model suggests who it became. The suggestion waits for the user: a name
-// they wrote themselves is never overwritten without them adopting it.
+// characters, and what each of them remembers. A native Session dragged from the left
+// sidebar onto a Bot is read into that Bot's memory — the Session itself stays where it
+// was, this only reads it — and the Bot's model suggests who it became. The suggestion
+// waits for the user: a name they wrote themselves is never overwritten without them
+// adopting it.
 //
 // Every learned Session is remembered per Bot, so the panel can send the user back to
 // the original conversation, and learn more from it later.
@@ -17,6 +18,8 @@ import { INKS } from './inks.js'
 import { DsBotNavIcon } from './sidebar.js'
 
 export const MEMORY_TAB_ID = 'ds-bot-memory'
+// Entries shown per Bot before "show all" — the panel is a glance, not the memory page.
+const ENTRIES_SHOWN = 6
 
 const zh = () => language().startsWith('zh')
 const say = (zhText, enText) => (zh() ? zhText : enText)
@@ -50,6 +53,14 @@ export const MEMORY_TAB_CSS = `
 .bt-mem-source-bot{font-size:11px;opacity:.55}
 .bt-mem-link{min-height:24px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary,inherit);font:inherit;font-size:11px;cursor:pointer;white-space:nowrap}
 .bt-mem-link:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.18));color:inherit}
+.bt-mem-group{display:flex;flex-direction:column;gap:4px}
+.bt-mem-group-head{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
+.bt-mem-count{font-size:11px;font-weight:400;opacity:.55}
+.bt-mem-entry{display:flex;align-items:flex-start;gap:6px;padding:5px 8px;border-radius:8px;background:var(--dsw-alias-bg-layer-1,rgba(127,127,127,.05));font-size:12px;line-height:1.45}
+.bt-mem-entry-text{flex:1;min-width:0;overflow-wrap:anywhere}
+.bt-mem-entry-src{flex:none;font-size:10px;opacity:.6}
+.bt-mem-more{align-self:flex-start;min-height:22px;padding:0 8px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary,inherit);font:inherit;font-size:11px;cursor:pointer}
+.bt-mem-more:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.18))}
 `
 
 let avatarSerial = 0
@@ -72,6 +83,9 @@ function BotAvatar({ look, size = 40 }) {
 }
 
 const lookOfBot = (bot) => ({ shape: bot?.avatar?.shape ?? 'whale', color: bot?.color ?? 'deepseek' })
+// A learned entry carries its origin as `session:<id>`; anything else (a Bot's own chat,
+// the memory panel) is not a Session the panel can open.
+const sessionOf = (source) => (typeof source === 'string' && source.startsWith('session:') ? source.slice('session:'.length).split(' ')[0] : null)
 
 export function MemoryTabTitle() {
   return h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 6 } },
@@ -90,12 +104,27 @@ export function MemoryTabBody(props) {
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
   const [sources, setSources] = useState({})
+  const [memories, setMemories] = useState({})
+  const [shown, setShown] = useState({})
   const bots = roster?.bots ?? []
 
   const refreshSources = async () => {
     try { setSources(await call('learned-sources') ?? {}) } catch { /* the panel still works */ }
   }
-  useEffect(() => { void refreshSources() }, [])
+  const refreshMemories = async () => {
+    const next = {}
+    await Promise.all(bots.map(async (bot) => {
+      try {
+        const view = await call('memory-view', { botId: bot.id })
+        next[bot.id] = Array.isArray(view?.entries) ? view.entries : []
+      } catch { next[bot.id] = [] }
+    }))
+    setMemories(next)
+  }
+  useEffect(() => {
+    void refreshSources()
+    void refreshMemories()
+  }, [bots.length])
 
   const learn = async (botId, sessionId) => {
     setBusy(botId)
@@ -111,6 +140,7 @@ export function MemoryTabBody(props) {
         suggestion: value?.suggestion ?? null,
       })
       void refreshSources()
+      void refreshMemories()
     } catch (failure) {
       setError(String(failure?.message ?? failure))
     } finally {
@@ -146,26 +176,30 @@ export function MemoryTabBody(props) {
     .flatMap(([botId, list]) => (Array.isArray(list) ? list : []).map(row => ({ botId, ...row })))
     .sort((a, b) => (b.at ?? 0) - (a.at ?? 0))
 
+  const openSession = (sessionId) => {
+    try { props.actions.show(sessionId) } catch { /* the session may be gone */ }
+  }
+
   const cards = useRoster === null
     ? null
     : bots.length === 0
-    ? h('div', { className: 'bt-mem-empty' }, say('团队还没有 Bot。', 'The team has no Bots yet.'))
-    : h('div', { className: 'bt-mem-grid' }, bots.map(bot => h('div', {
-      key: bot.id,
-      className: 'bt-mem-card',
-      'data-over': over === bot.id ? '' : undefined,
-      'data-busy': busy === bot.id ? '' : undefined,
-      onDragOver: (event) => {
-        event.preventDefault()
-        if (event.dataTransfer !== null) event.dataTransfer.dropEffect = 'copy'
-        if (over !== bot.id) setOver(bot.id)
+      ? h('div', { className: 'bt-mem-empty' }, say('团队还没有 Bot。', 'The team has no Bots yet.'))
+      : h('div', { className: 'bt-mem-grid' }, bots.map(bot => h('div', {
+        key: bot.id,
+        className: 'bt-mem-card',
+        'data-over': over === bot.id ? '' : undefined,
+        'data-busy': busy === bot.id ? '' : undefined,
+        onDragOver: (event) => {
+          event.preventDefault()
+          if (event.dataTransfer !== null) event.dataTransfer.dropEffect = 'copy'
+          if (over !== bot.id) setOver(bot.id)
+        },
+        onDragLeave: () => { if (over === bot.id) setOver(null) },
+        onDrop: (event) => onDrop(event, bot.id),
       },
-      onDragLeave: () => { if (over === bot.id) setOver(null) },
-      onDrop: (event) => onDrop(event, bot.id),
-    },
-    h(BotAvatar, { look: lookOfBot(bot), size: 40 }),
-    h('div', { className: 'bt-mem-name' }, bot.name),
-    bot.role ? h('div', { className: 'bt-mem-role' }, bot.role) : null)))
+      h(BotAvatar, { look: lookOfBot(bot), size: 40 }),
+      h('div', { className: 'bt-mem-name' }, bot.name),
+      bot.role ? h('div', { className: 'bt-mem-role' }, bot.role) : null)))
 
   const suggestion = result !== null && result.suggestion !== null
     ? h('div', { className: 'bt-mem-suggest' },
@@ -192,7 +226,7 @@ export function MemoryTabBody(props) {
           type: 'button',
           className: 'bt-mem-link',
           title: say('回到这条会话', 'Open the original session'),
-          onClick: () => { try { props.actions.show(row.sessionId) } catch { /* the session may be gone */ } },
+          onClick: () => openSession(row.sessionId),
         }, say('跳转', 'Open')),
         h('button', {
           type: 'button',
@@ -201,6 +235,43 @@ export function MemoryTabBody(props) {
           disabled: busy !== null,
           onClick: () => { void learn(row.botId, row.sessionId) },
         }, say('再学', 'Relearn')))))
+
+  // What each Bot remembers, as the memory system itself sees it: the same entries the
+  // Bot's memory page lists, with the Session they came from when there is one.
+  const remembered = bots.length === 0
+    ? null
+    : h('div', { className: 'bt-mem-sources' },
+      h('div', { className: 'bt-mem-title' }, say('它们记得什么', 'What they remember')),
+      bots.map((bot) => {
+        const entries = memories[bot.id] ?? []
+        if (entries.length === 0) return null
+        const all = shown[bot.id] === true
+        const visible = all ? entries : entries.slice(0, ENTRIES_SHOWN)
+        return h('div', { key: bot.id, className: 'bt-mem-group' },
+          h('div', { className: 'bt-mem-group-head' },
+            h('span', null, bot.name),
+            h('span', { className: 'bt-mem-count' }, `${entries.length}`)),
+          visible.map(entry => {
+            const sessionId = sessionOf(entry.source)
+            return h('div', { key: `${bot.id}:${entry.text}`, className: 'bt-mem-entry' },
+              h('span', { className: 'bt-mem-entry-text' }, entry.text),
+              sessionId === null
+                ? null
+                : h('button', {
+                  type: 'button',
+                  className: 'bt-mem-link bt-mem-entry-src',
+                  title: say('来自这条会话，点开看看', 'From this Session — open it'),
+                  onClick: () => openSession(sessionId),
+                }, say('来源', 'source')))
+          }),
+          entries.length > ENTRIES_SHOWN
+            ? h('button', {
+              type: 'button',
+              className: 'bt-mem-more',
+              onClick: () => setShown(state => ({ ...state, [bot.id]: !all })),
+            }, all ? say('收起', 'Show less') : say(`显示全部 ${entries.length} 条`, `Show all ${entries.length}`))
+            : null)
+      }))
 
   return h('div', { className: 'bt-mem' },
     h('div', { className: 'bt-mem-head' },
@@ -213,5 +284,6 @@ export function MemoryTabBody(props) {
     busy !== null ? h('div', { className: 'bt-mem-note' }, say('正在读这个会话…', 'Reading the session…')) : null,
     error !== '' ? h('div', { className: 'bt-mem-error' }, error) : null,
     suggestion,
-    learned)
+    learned,
+    remembered)
 }
