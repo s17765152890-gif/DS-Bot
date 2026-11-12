@@ -12,6 +12,7 @@ import { installSettingsShell, SETTINGS_SHELL_CSS } from './settings-shell.js'
 import { frameLayout, readSidebar, writeSidebar, toggledPref, DSH_NARROW } from './frame-layout.js'
 import { SURFACE_SWITCH_CSS, installSurfaceSwitch } from './surface-switch.js'
 import { MEMORY_TAB_ID, MEMORY_TAB_CSS, MemoryTabBody, MemoryTabTitle } from './memory-tab.js'
+import { installSessionDrag } from './session-drag.js'
 import { installFrameWatch } from './frame-watch.js'
 import { HeaderPill } from './header.js'
 import { ComposerPlus, ComposerVoice, menuIcons } from './composer.js'
@@ -1260,6 +1261,10 @@ export function apply(ctx) {
       style.remove()
     }
   }, 'ds-bot: memory tab')
+  // A pinned Session at the top of the sidebar is rendered by a section that gives it no
+  // drag controller, so it cannot be picked up at all. This makes those rows draggable
+  // for the panel, without moving anything.
+  ctx.effect(() => installSessionDrag(), 'ds-bot: session drag')
   ctx.inject(['sidebarRightTabs'], (scope) => {
     scope.effect(() => scope.sidebarRightTabs.register({
       id: MEMORY_TAB_ID,

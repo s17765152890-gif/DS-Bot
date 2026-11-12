@@ -23098,6 +23098,39 @@ function MemoryTabBody(props) {
   );
 }
 
+// src/client/session-drag.js
+var ROW = '[data-row-key^="session:"]';
+var PREFIX2 = "session:";
+var wired = /* @__PURE__ */ new WeakSet();
+function installSessionDrag() {
+  if (typeof document === "undefined") return () => {
+  };
+  const patch = () => {
+    for (const row of document.querySelectorAll(ROW)) {
+      const key = row.getAttribute("data-row-key") ?? "";
+      const sessionId = key.startsWith(PREFIX2) ? key.slice(PREFIX2.length) : "";
+      if (sessionId === "") continue;
+      if (row.getAttribute("draggable") !== "true") row.setAttribute("draggable", "true");
+      if (wired.has(row)) continue;
+      wired.add(row);
+      row.addEventListener("dragstart", (event) => {
+        if (event.dataTransfer === null) return;
+        event.dataTransfer.effectAllowed = "copy";
+        event.dataTransfer.setData("text/plain", sessionId);
+      });
+    }
+  };
+  const observer = new MutationObserver(patch);
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["draggable"]
+  });
+  patch();
+  return () => observer.disconnect();
+}
+
 // src/client/header.js
 var import_react50 = require("react");
 var import_react_dom8 = require("react-dom");
@@ -30277,6 +30310,7 @@ function apply(ctx) {
       style.remove();
     };
   }, "ds-bot: memory tab");
+  ctx.effect(() => installSessionDrag(), "ds-bot: session drag");
   ctx.inject(["sidebarRightTabs"], (scope) => {
     scope.effect(() => scope.sidebarRightTabs.register({
       id: MEMORY_TAB_ID,
