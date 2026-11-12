@@ -209,6 +209,26 @@ export function install(rt) {
   const LEARN_READ_MS = 20_000
   const LEARN_TEXT_MAX = 14_000
   const LEARN_PROMPT_MAX = 6_000
+  // A Session's title, for the panel's "learned from" rows. The sessions service comes
+  // in two shapes across DSH versions — a snapshot store (`list.getSnapshot().byId`) and
+  // a callable list (`list()`) — so both are tried. A title is cosmetic: any failure
+  // yields '', never an error for the caller.
+  const sessionTitleOf = async (sessionId) => {
+    const sessions = ctx?.sessions
+    const list = sessions?.list
+    try {
+      if (typeof list === 'function') {
+        let rows = list.call(sessions)
+        if (rows !== null && typeof rows?.then === 'function') rows = await rows
+        if (Array.isArray(rows)) {
+          const row = rows.find(item => (item?.id ?? item?.header?.id) === sessionId)
+          if (row !== undefined) return String(row.title ?? row.header?.title ?? '')
+        }
+      }
+      const byId = typeof list?.getSnapshot === 'function' ? (list.getSnapshot()?.byId ?? {}) : {}
+      return String(byId[sessionId]?.title ?? '')
+    } catch { return '' }
+  }
   const learnTranscript = async (sessionId) => {
     const lines = []
     for await (const line of rt.partLines(sessionId, AbortSignal.timeout(LEARN_READ_MS), { pages: Infinity })) {
@@ -581,7 +601,7 @@ export function install(rt) {
           // mapped to the Bot that takes it in.
           rt.pastOwners.set(sessionId, { botId: bot.id })
           const learned = await rt.memoryReviewNow(sessionId, { sourceTag: `session:${sessionId}` })
-          const title = ctx.sessions.list.getSnapshot().byId?.[sessionId]?.title ?? ''
+          const title = await sessionTitleOf(sessionId)
           noteLearned(bot.id, sessionId, title)
           const suggestion = await learnPersona(bot, transcript)
           await rt.save()
