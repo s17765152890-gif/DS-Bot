@@ -4,9 +4,12 @@
 // the Bot's model suggests who it became. The suggestion waits for the user: a name
 // they wrote themselves is never overwritten without them adopting it.
 //
+// Every learned Session is remembered per Bot, so the panel can send the user back to
+// the original conversation, and learn more from it later.
+//
 // This is the native surface's seat for the team, not the Bot surface's own memory
 // dialog (that one is memory-panel.js and lives inside DS Bot's shell).
-import { createElement as h, useState } from 'react'
+import { createElement as h, useEffect, useState } from 'react'
 import { call } from './api.js'
 import { language } from './i18n.js'
 import { characterMarkup, MASK_ID, shapeOf } from './characters.js'
@@ -40,6 +43,13 @@ export const MEMORY_TAB_CSS = `
 .bt-mem-btn:hover{background:var(--dsw-alias-interactive-bg-active,rgba(127,127,127,.28))}
 .bt-mem-btn[data-primary]{background:var(--dsw-alias-state-business-primary,#4D6BFE);color:#fff}
 .bt-mem-empty{font-size:12px;opacity:.6}
+.bt-mem-sources{display:flex;flex-direction:column;gap:6px}
+.bt-mem-source{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;background:var(--dsw-alias-bg-layer-1,rgba(127,127,127,.06))}
+.bt-mem-source-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.bt-mem-source-title{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bt-mem-source-bot{font-size:11px;opacity:.55}
+.bt-mem-link{min-height:24px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary,inherit);font:inherit;font-size:11px;cursor:pointer;white-space:nowrap}
+.bt-mem-link:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.18));color:inherit}
 `
 
 let avatarSerial = 0
@@ -75,7 +85,13 @@ export function MemoryTabBody(props) {
   const [over, setOver] = useState(null)
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
+  const [sources, setSources] = useState({})
   const bots = roster?.bots ?? []
+
+  const refreshSources = async () => {
+    try { setSources(await call('learned-sources') ?? {}) } catch { /* the panel still works */ }
+  }
+  useEffect(() => { void refreshSources() }, [])
 
   const learn = async (botId, sessionId) => {
     setBusy(botId)
@@ -87,9 +103,10 @@ export function MemoryTabBody(props) {
       setResult({
         botId,
         botName: bot?.name ?? '',
-        learned: value?.learned,
+        title: value?.title ?? '',
         suggestion: value?.suggestion ?? null,
       })
+      void refreshSources()
     } catch (failure) {
       setError(String(failure?.message ?? failure))
     } finally {
@@ -120,41 +137,72 @@ export function MemoryTabBody(props) {
     }
   }
 
+  const nameOf = (botId) => bots.find(bot => bot.id === botId)?.name ?? botId
+  const rows = Object.entries(sources)
+    .flatMap(([botId, list]) => (Array.isArray(list) ? list : []).map(row => ({ botId, ...row })))
+    .sort((a, b) => (b.at ?? 0) - (a.at ?? 0))
+
+  const cards = bots.length === 0
+    ? h('div', { className: 'bt-mem-empty' }, say('团队还没有 Bot。', 'The team has no Bots yet.'))
+    : h('div', { className: 'bt-mem-grid' }, bots.map(bot => h('div', {
+      key: bot.id,
+      className: 'bt-mem-card',
+      'data-over': over === bot.id ? '' : undefined,
+      'data-busy': busy === bot.id ? '' : undefined,
+      onDragOver: (event) => {
+        event.preventDefault()
+        if (event.dataTransfer !== null) event.dataTransfer.dropEffect = 'copy'
+        if (over !== bot.id) setOver(bot.id)
+      },
+      onDragLeave: () => { if (over === bot.id) setOver(null) },
+      onDrop: (event) => onDrop(event, bot.id),
+    },
+    h(BotAvatar, { look: lookOfBot(bot), size: 40 }),
+    h('div', { className: 'bt-mem-name' }, bot.name),
+    bot.role ? h('div', { className: 'bt-mem-role' }, bot.role) : null)))
+
+  const suggestion = result !== null && result.suggestion !== null
+    ? h('div', { className: 'bt-mem-suggest' },
+      h('div', { className: 'bt-mem-note' }, say(`${result.botName} 学完了，它觉得自己变成了：`, `${result.botName} learned it. It thinks it became:`)),
+      h('div', { className: 'bt-mem-suggest-name' }, result.suggestion.name || say('（名字不变）', '(name unchanged)')),
+      h('div', { className: 'bt-mem-suggest-duty' }, result.suggestion.duty || ''),
+      h('div', { className: 'bt-mem-note' }, say('采纳才会改写它的名字和职责。', 'Adopting rewrites its name and role.')),
+      h('div', { className: 'bt-mem-actions' },
+        h('button', { type: 'button', className: 'bt-mem-btn', 'data-primary': '', onClick: () => { void adopt() } }, say('采纳', 'Adopt')),
+        h('button', { type: 'button', className: 'bt-mem-btn', onClick: () => setResult(null) }, say('忽略', 'Dismiss'))))
+    : result !== null
+      ? h('div', { className: 'bt-mem-note' }, say(`${result.botName} 学完了，但没给出人设建议。`, `${result.botName} learned it, but offered no persona suggestion.`))
+      : null
+
+  const learned = rows.length === 0
+    ? null
+    : h('div', { className: 'bt-mem-sources' },
+      h('div', { className: 'bt-mem-title' }, say('学过的会话', 'Sessions learned')),
+      rows.map(row => h('div', { key: `${row.botId}:${row.sessionId}`, className: 'bt-mem-source' },
+        h('div', { className: 'bt-mem-source-text' },
+          h('div', { className: 'bt-mem-source-title', title: row.title || row.sessionId }, row.title || row.sessionId),
+          h('div', { className: 'bt-mem-source-bot' }, nameOf(row.botId))),
+        h('button', {
+          type: 'button',
+          className: 'bt-mem-link',
+          title: say('回到这条会话', 'Open the original session'),
+          onClick: () => { try { props.actions.show(row.sessionId) } catch { /* the session may be gone */ } },
+        }, say('跳转', 'Open')),
+        h('button', {
+          type: 'button',
+          className: 'bt-mem-link',
+          title: say('再读一遍，学新的内容', 'Read it again for anything new'),
+          disabled: busy !== null,
+          onClick: () => { void learn(row.botId, row.sessionId) },
+        }, say('再学', 'Relearn')))))
+
   return h('div', { className: 'bt-mem' },
     h('div', { className: 'bt-mem-head' },
       h('div', { className: 'bt-mem-title' }, say('DS Bot 记忆', 'DS Bot memory')),
       h('div', { className: 'bt-mem-hint' }, say('把左侧的会话拖到某个 Bot 上，它会读完并记住；会话本身留在原处。', 'Drag a session from the left onto a Bot: it reads it into memory and the session stays where it was.'))),
-    bots.length === 0
-      ? h('div', { className: 'bt-mem-empty' }, say('团队还没有 Bot。', 'The team has no Bots yet.'))
-      : h('div', { className: 'bt-mem-grid' }, bots.map(bot => h('div', {
-        key: bot.id,
-        className: 'bt-mem-card',
-        'data-over': over === bot.id ? '' : undefined,
-        'data-busy': busy === bot.id ? '' : undefined,
-        onDragOver: (event) => {
-          event.preventDefault()
-          if (event.dataTransfer !== null) event.dataTransfer.dropEffect = 'copy'
-          if (over !== bot.id) setOver(bot.id)
-        },
-        onDragLeave: () => { if (over === bot.id) setOver(null) },
-        onDrop: (event) => onDrop(event, bot.id),
-      },
-      h(BotAvatar, { look: lookOfBot(bot), size: 40 }),
-      h('div', { className: 'bt-mem-name' }, bot.name),
-      bot.role ? h('div', { className: 'bt-mem-role' }, bot.role) : null))),
+    cards,
     busy !== null ? h('div', { className: 'bt-mem-note' }, say('正在读这个会话…', 'Reading the session…')) : null,
     error !== '' ? h('div', { className: 'bt-mem-error' }, error) : null,
-    result !== null && result.suggestion !== null
-      ? h('div', { className: 'bt-mem-suggest' },
-        h('div', { className: 'bt-mem-note' }, say(`${result.botName} 学完了，它觉得自己变成了：`, `${result.botName} learned it. It thinks it became:`)),
-        h('div', { className: 'bt-mem-suggest-name' }, result.suggestion.name || say('（名字不变）', '(name unchanged)')),
-        h('div', { className: 'bt-mem-suggest-duty' }, result.suggestion.duty || ''),
-        h('div', { className: 'bt-mem-note' }, say('采纳才会改写它的名字和职责。', 'Adopting rewrites its name and role.')),
-        h('div', { className: 'bt-mem-actions' },
-          h('button', { type: 'button', className: 'bt-mem-btn', 'data-primary': '', onClick: () => { void adopt() } }, say('采纳', 'Adopt')),
-          h('button', { type: 'button', className: 'bt-mem-btn', onClick: () => setResult(null) }, say('忽略', 'Dismiss'))))
-      : null,
-    result !== null && result.suggestion === null
-      ? h('div', { className: 'bt-mem-note' }, say(`${result.botName} 学完了，但没给出人设建议。`, `${result.botName} learned it, but offered no persona suggestion.`))
-      : null)
+    suggestion,
+    learned)
 }

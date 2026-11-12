@@ -233,8 +233,12 @@ export function installReview(rt, memory) {
     const bot = rt.botOf(reviewOf(seen.sessionId)?.botId ?? seen.botId)
     if (bot === undefined) return
     const since = cursorsNow()[seen.key]
+    const batch = await chatBatch(seen.sessionId, bot, since)
+    // A Session learned on purpose leaves a pointer back to itself in what it teaches,
+    // so a later reader can go to that Session instead of guessing where it came from.
+    if (seen.sourceTag !== undefined) batch.source = () => seen.sourceTag
     await reviewBatch({
-      key: seen.key, since, batch: await chatBatch(seen.sessionId, bot, since),
+      key: seen.key, since, batch,
       keeper: bot, name: bot.name, home: ownScope(bot.id), teamWrites: () => writesTeam(bot.id),
       who: `The Bot: ${bot.name}${bot.role ? `, ${bot.role}` : ''}.`,
       tag: { sessionId: rt.chatOf(bot.id), kind: 'memory' },
@@ -406,11 +410,13 @@ export function installReview(rt, memory) {
   // Session" action calls it for a Session the team does not own (the caller maps that
   // Session to the Bot taking it in first, through pastOwners). Returns the counts the
   // review wrote, or false when the Session maps to no conversation at all.
-  const reviewNow = async (sessionId) => {
+  const reviewNow = async (sessionId, options) => {
     const seen = reviewOf(sessionId)
     if (seen === undefined) return false
     if (rt.readOnly() !== undefined) throw new Error('this dsh is read-only for the team')
-    return seen.roomId === undefined ? await reviewChat(seen) : await reviewGroup(seen)
+    const tag = options?.sourceTag
+    const marked = tag === undefined ? seen : { ...seen, sourceTag: tag }
+    return seen.roomId === undefined ? await reviewChat(marked) : await reviewGroup(marked)
   }
 
   return { memoryReviews, reviewNow }

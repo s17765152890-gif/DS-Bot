@@ -22917,6 +22917,13 @@ var MEMORY_TAB_CSS = `
 .bt-mem-btn:hover{background:var(--dsw-alias-interactive-bg-active,rgba(127,127,127,.28))}
 .bt-mem-btn[data-primary]{background:var(--dsw-alias-state-business-primary,#4D6BFE);color:#fff}
 .bt-mem-empty{font-size:12px;opacity:.6}
+.bt-mem-sources{display:flex;flex-direction:column;gap:6px}
+.bt-mem-source{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;background:var(--dsw-alias-bg-layer-1,rgba(127,127,127,.06))}
+.bt-mem-source-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.bt-mem-source-title{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bt-mem-source-bot{font-size:11px;opacity:.55}
+.bt-mem-link{min-height:24px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary,inherit);font:inherit;font-size:11px;cursor:pointer;white-space:nowrap}
+.bt-mem-link:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.18));color:inherit}
 `;
 var avatarSerial = 0;
 function BotAvatar2({ look, size = 40 }) {
@@ -22948,7 +22955,17 @@ function MemoryTabBody(props) {
   const [over, setOver] = (0, import_react49.useState)(null);
   const [result, setResult] = (0, import_react49.useState)(null);
   const [error, setError] = (0, import_react49.useState)("");
+  const [sources, setSources] = (0, import_react49.useState)({});
   const bots = roster?.bots ?? [];
+  const refreshSources = async () => {
+    try {
+      setSources(await call("learned-sources") ?? {});
+    } catch {
+    }
+  };
+  (0, import_react49.useEffect)(() => {
+    void refreshSources();
+  }, []);
   const learn = async (botId, sessionId) => {
     setBusy(botId);
     setError("");
@@ -22959,9 +22976,10 @@ function MemoryTabBody(props) {
       setResult({
         botId,
         botName: bot?.name ?? "",
-        learned: value?.learned,
+        title: value?.title ?? "",
         suggestion: value?.suggestion ?? null
       });
+      void refreshSources();
     } catch (failure) {
       setError(String(failure?.message ?? failure));
     } finally {
@@ -22976,19 +22994,93 @@ function MemoryTabBody(props) {
     void learn(botId, sessionId);
   };
   const adopt = async () => {
-    const suggestion = result?.suggestion;
-    if (suggestion === null || suggestion === void 0) return;
+    const suggestion2 = result?.suggestion;
+    if (suggestion2 === null || suggestion2 === void 0) return;
     try {
       await call("update-bot", {
         id: result.botId,
-        ...suggestion.name ? { name: suggestion.name } : {},
-        ...suggestion.duty ? { role: suggestion.duty } : {}
+        ...suggestion2.name ? { name: suggestion2.name } : {},
+        ...suggestion2.duty ? { role: suggestion2.duty } : {}
       });
       setResult(null);
     } catch (failure) {
       setError(String(failure?.message ?? failure));
     }
   };
+  const nameOf2 = (botId) => bots.find((bot) => bot.id === botId)?.name ?? botId;
+  const rows2 = Object.entries(sources).flatMap(([botId, list]) => (Array.isArray(list) ? list : []).map((row) => ({ botId, ...row }))).sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
+  const cards = bots.length === 0 ? (0, import_react49.createElement)("div", { className: "bt-mem-empty" }, say("团队还没有 Bot。", "The team has no Bots yet.")) : (0, import_react49.createElement)("div", { className: "bt-mem-grid" }, bots.map((bot) => (0, import_react49.createElement)(
+    "div",
+    {
+      key: bot.id,
+      className: "bt-mem-card",
+      "data-over": over === bot.id ? "" : void 0,
+      "data-busy": busy === bot.id ? "" : void 0,
+      onDragOver: (event) => {
+        event.preventDefault();
+        if (event.dataTransfer !== null) event.dataTransfer.dropEffect = "copy";
+        if (over !== bot.id) setOver(bot.id);
+      },
+      onDragLeave: () => {
+        if (over === bot.id) setOver(null);
+      },
+      onDrop: (event) => onDrop(event, bot.id)
+    },
+    (0, import_react49.createElement)(BotAvatar2, { look: lookOfBot(bot), size: 40 }),
+    (0, import_react49.createElement)("div", { className: "bt-mem-name" }, bot.name),
+    bot.role ? (0, import_react49.createElement)("div", { className: "bt-mem-role" }, bot.role) : null
+  )));
+  const suggestion = result !== null && result.suggestion !== null ? (0, import_react49.createElement)(
+    "div",
+    { className: "bt-mem-suggest" },
+    (0, import_react49.createElement)("div", { className: "bt-mem-note" }, say(`${result.botName} 学完了，它觉得自己变成了：`, `${result.botName} learned it. It thinks it became:`)),
+    (0, import_react49.createElement)("div", { className: "bt-mem-suggest-name" }, result.suggestion.name || say("（名字不变）", "(name unchanged)")),
+    (0, import_react49.createElement)("div", { className: "bt-mem-suggest-duty" }, result.suggestion.duty || ""),
+    (0, import_react49.createElement)("div", { className: "bt-mem-note" }, say("采纳才会改写它的名字和职责。", "Adopting rewrites its name and role.")),
+    (0, import_react49.createElement)(
+      "div",
+      { className: "bt-mem-actions" },
+      (0, import_react49.createElement)("button", { type: "button", className: "bt-mem-btn", "data-primary": "", onClick: () => {
+        void adopt();
+      } }, say("采纳", "Adopt")),
+      (0, import_react49.createElement)("button", { type: "button", className: "bt-mem-btn", onClick: () => setResult(null) }, say("忽略", "Dismiss"))
+    )
+  ) : result !== null ? (0, import_react49.createElement)("div", { className: "bt-mem-note" }, say(`${result.botName} 学完了，但没给出人设建议。`, `${result.botName} learned it, but offered no persona suggestion.`)) : null;
+  const learned = rows2.length === 0 ? null : (0, import_react49.createElement)(
+    "div",
+    { className: "bt-mem-sources" },
+    (0, import_react49.createElement)("div", { className: "bt-mem-title" }, say("学过的会话", "Sessions learned")),
+    rows2.map((row) => (0, import_react49.createElement)(
+      "div",
+      { key: `${row.botId}:${row.sessionId}`, className: "bt-mem-source" },
+      (0, import_react49.createElement)(
+        "div",
+        { className: "bt-mem-source-text" },
+        (0, import_react49.createElement)("div", { className: "bt-mem-source-title", title: row.title || row.sessionId }, row.title || row.sessionId),
+        (0, import_react49.createElement)("div", { className: "bt-mem-source-bot" }, nameOf2(row.botId))
+      ),
+      (0, import_react49.createElement)("button", {
+        type: "button",
+        className: "bt-mem-link",
+        title: say("回到这条会话", "Open the original session"),
+        onClick: () => {
+          try {
+            props.actions.show(row.sessionId);
+          } catch {
+          }
+        }
+      }, say("跳转", "Open")),
+      (0, import_react49.createElement)("button", {
+        type: "button",
+        className: "bt-mem-link",
+        title: say("再读一遍，学新的内容", "Read it again for anything new"),
+        disabled: busy !== null,
+        onClick: () => {
+          void learn(row.botId, row.sessionId);
+        }
+      }, say("再学", "Relearn"))
+    ))
+  );
   return (0, import_react49.createElement)(
     "div",
     { className: "bt-mem" },
@@ -22998,46 +23090,11 @@ function MemoryTabBody(props) {
       (0, import_react49.createElement)("div", { className: "bt-mem-title" }, say("DS Bot 记忆", "DS Bot memory")),
       (0, import_react49.createElement)("div", { className: "bt-mem-hint" }, say("把左侧的会话拖到某个 Bot 上，它会读完并记住；会话本身留在原处。", "Drag a session from the left onto a Bot: it reads it into memory and the session stays where it was."))
     ),
-    bots.length === 0 ? (0, import_react49.createElement)("div", { className: "bt-mem-empty" }, say("团队还没有 Bot。", "The team has no Bots yet.")) : (0, import_react49.createElement)("div", { className: "bt-mem-grid" }, bots.map((bot) => (0, import_react49.createElement)(
-      "div",
-      {
-        key: bot.id,
-        className: "bt-mem-card",
-        "data-over": over === bot.id ? "" : void 0,
-        "data-busy": busy === bot.id ? "" : void 0,
-        onDragOver: (event) => {
-          event.preventDefault();
-          if (event.dataTransfer !== null) event.dataTransfer.dropEffect = "copy";
-          if (over !== bot.id) setOver(bot.id);
-        },
-        onDragLeave: () => {
-          if (over === bot.id) setOver(null);
-        },
-        onDrop: (event) => onDrop(event, bot.id)
-      },
-      (0, import_react49.createElement)(BotAvatar2, { look: lookOfBot(bot), size: 40 }),
-      (0, import_react49.createElement)("div", { className: "bt-mem-name" }, bot.name),
-      bot.role ? (0, import_react49.createElement)("div", { className: "bt-mem-role" }, bot.role) : null
-    ))),
+    cards,
     busy !== null ? (0, import_react49.createElement)("div", { className: "bt-mem-note" }, say("正在读这个会话…", "Reading the session…")) : null,
     error !== "" ? (0, import_react49.createElement)("div", { className: "bt-mem-error" }, error) : null,
-    result !== null && result.suggestion !== null ? (0, import_react49.createElement)(
-      "div",
-      { className: "bt-mem-suggest" },
-      (0, import_react49.createElement)("div", { className: "bt-mem-note" }, say(`${result.botName} 学完了，它觉得自己变成了：`, `${result.botName} learned it. It thinks it became:`)),
-      (0, import_react49.createElement)("div", { className: "bt-mem-suggest-name" }, result.suggestion.name || say("（名字不变）", "(name unchanged)")),
-      (0, import_react49.createElement)("div", { className: "bt-mem-suggest-duty" }, result.suggestion.duty || ""),
-      (0, import_react49.createElement)("div", { className: "bt-mem-note" }, say("采纳才会改写它的名字和职责。", "Adopting rewrites its name and role.")),
-      (0, import_react49.createElement)(
-        "div",
-        { className: "bt-mem-actions" },
-        (0, import_react49.createElement)("button", { type: "button", className: "bt-mem-btn", "data-primary": "", onClick: () => {
-          void adopt();
-        } }, say("采纳", "Adopt")),
-        (0, import_react49.createElement)("button", { type: "button", className: "bt-mem-btn", onClick: () => setResult(null) }, say("忽略", "Dismiss"))
-      )
-    ) : null,
-    result !== null && result.suggestion === null ? (0, import_react49.createElement)("div", { className: "bt-mem-note" }, say(`${result.botName} 学完了，但没给出人设建议。`, `${result.botName} learned it, but offered no persona suggestion.`)) : null
+    suggestion,
+    learned
   );
 }
 

@@ -1,5 +1,7 @@
 // Client channel: the team view the browser renders, and the POST /api/bot endpoints.
 import { randomUUID } from 'node:crypto'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { install as installBtw } from './btw.js'
 import { install as installSide } from './side.js'
@@ -236,6 +238,29 @@ export function install(rt) {
     } catch (error) {
       rt.warn('ds-bot: persona suggestion failed: %s', error?.message ?? error)
       return null
+    }
+  }
+
+  // Which Sessions each Bot learned from, newest first. Kept beside the memory so the
+  // panel can send the user back to the original conversation, and so a Bot can be sent
+  // back to read more of it later.
+  const learnedPath = () => join(rt.home, 'memory', 'learned.json')
+  const readLearned = () => {
+    try {
+      const value = JSON.parse(readFileSync(learnedPath(), 'utf8'))
+      return value !== null && typeof value === 'object' && !Array.isArray(value) ? value : {}
+    } catch { return {} }
+  }
+  const noteLearned = (botId, sessionId, title) => {
+    const all = readLearned()
+    const rows = (Array.isArray(all[botId]) ? all[botId] : []).filter(row => row?.sessionId !== sessionId)
+    rows.unshift({ sessionId, title: String(title ?? ''), at: Date.now() })
+    all[botId] = rows.slice(0, 40)
+    try {
+      mkdirSync(join(rt.home, 'memory'), { recursive: true })
+      writeFileSync(learnedPath(), JSON.stringify(all, null, 2))
+    } catch (error) {
+      rt.warn('ds-bot: learned sources could not be saved: %s', error?.message ?? error)
     }
   }
 
@@ -555,11 +580,18 @@ export function install(rt) {
           // The review maps a Session to its owner; a dropped Session has none, so it is
           // mapped to the Bot that takes it in.
           rt.pastOwners.set(sessionId, { botId: bot.id })
-          const learned = await rt.memoryReviewNow(sessionId)
+          const learned = await rt.memoryReviewNow(sessionId, { sourceTag: `session:${sessionId}` })
+          const title = ctx.sessions.list.getSnapshot().byId?.[sessionId]?.title ?? ''
+          noteLearned(bot.id, sessionId, title)
           const suggestion = await learnPersona(bot, transcript)
           await rt.save()
-          return ok({ learned, suggestion })
+          return ok({ learned, suggestion, title })
         }
+        // Which Sessions each Bot has learned from: the panel shows them so the user can
+        // go back to the original conversation, and learn more from it later.
+        case 'learned-sources':
+          await rt.load()
+          return ok(readLearned())
         case 'learning-answer':
           await rt.load()
           return ok(await rt.learningEndpoint(endpoint, body))
