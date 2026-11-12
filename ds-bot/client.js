@@ -22950,7 +22950,8 @@ function MemoryTabTitle() {
   );
 }
 function MemoryTabBody(props) {
-  const roster = props.useRoster((value) => value);
+  const useRoster = typeof props?.useRoster === "function" ? props.useRoster : null;
+  const roster = useRoster === null ? null : useRoster((value) => value);
   const [busy, setBusy] = (0, import_react49.useState)(null);
   const [over, setOver] = (0, import_react49.useState)(null);
   const [result, setResult] = (0, import_react49.useState)(null);
@@ -23009,7 +23010,7 @@ function MemoryTabBody(props) {
   };
   const nameOf2 = (botId) => bots.find((bot) => bot.id === botId)?.name ?? botId;
   const rows2 = Object.entries(sources).flatMap(([botId, list]) => (Array.isArray(list) ? list : []).map((row) => ({ botId, ...row }))).sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
-  const cards = bots.length === 0 ? (0, import_react49.createElement)("div", { className: "bt-mem-empty" }, say("团队还没有 Bot。", "The team has no Bots yet.")) : (0, import_react49.createElement)("div", { className: "bt-mem-grid" }, bots.map((bot) => (0, import_react49.createElement)(
+  const cards = useRoster === null ? null : bots.length === 0 ? (0, import_react49.createElement)("div", { className: "bt-mem-empty" }, say("团队还没有 Bot。", "The team has no Bots yet.")) : (0, import_react49.createElement)("div", { className: "bt-mem-grid" }, bots.map((bot) => (0, import_react49.createElement)(
     "div",
     {
       key: bot.id,
@@ -23090,6 +23091,7 @@ function MemoryTabBody(props) {
       (0, import_react49.createElement)("div", { className: "bt-mem-title" }, say("DS Bot 记忆", "DS Bot memory")),
       (0, import_react49.createElement)("div", { className: "bt-mem-hint" }, say("把左侧的会话拖到某个 Bot 上，它会读完并记住；会话本身留在原处。", "Drag a session from the left onto a Bot: it reads it into memory and the session stays where it was."))
     ),
+    useRoster === null ? (0, import_react49.createElement)("div", { className: "bt-mem-error" }, say("面板没拿到团队数据（hooks 未注入）。把这句话告诉我，我去改注册方式。", "The panel got no team data (hooks not injected). Tell me this line and I will fix the registration.")) : null,
     cards,
     busy !== null ? (0, import_react49.createElement)("div", { className: "bt-mem-note" }, say("正在读这个会话…", "Reading the session…")) : null,
     error !== "" ? (0, import_react49.createElement)("div", { className: "bt-mem-error" }, error) : null,
