@@ -200,6 +200,45 @@ export function install(rt) {
     return rt.save()
   }
 
+  // Learning from a Session the team does not own: the memory panel drops a Session on
+  // a Bot. The Bot's own memory review reads it, and its model suggests who the Bot
+  // became. The suggestion is only a suggestion — a name the user wrote themselves is
+  // never overwritten by it.
+  const LEARN_READ_MS = 20_000
+  const LEARN_TEXT_MAX = 14_000
+  const LEARN_PROMPT_MAX = 6_000
+  const learnTranscript = async (sessionId) => {
+    const lines = []
+    for await (const line of rt.partLines(sessionId, AbortSignal.timeout(LEARN_READ_MS), { pages: Infinity })) {
+      const who = line.who === 'user' ? 'User' : line.who === 'you' ? 'Bot' : String(line.who ?? 'Other')
+      const text = String(line.text ?? '').trim()
+      if (text !== '') lines.push(`${who}: ${text}`)
+    }
+    const joined = lines.join('\n')
+    return joined.length > LEARN_TEXT_MAX ? joined.slice(-LEARN_TEXT_MAX) : joined
+  }
+  const learnPersona = async (bot, transcript) => {
+    const zh = String(uiLocale ?? '').startsWith('zh')
+    const system = zh
+      ? '你在为一个长期存在的助手 Bot 定人设。根据它刚学到的会话，只输出 JSON：{"name":"…","duty":"…"}。name 是一个像职称的名字，不超过 12 个汉字；duty 是一句话，说明它负责什么，不超过 30 个汉字。不要输出代码块、引号或任何多余文字。'
+      : 'You name a long-lived assistant Bot. From the conversation it just learned, answer with JSON only: {"name":"…","duty":"…"}. name is a role-like title of at most 3 words; duty is one sentence of at most 15 words saying what it does. No code fences, no extra text.'
+    const tail = transcript.length > LEARN_PROMPT_MAX ? transcript.slice(-LEARN_PROMPT_MAX) : transcript
+    const text = `Current name: ${bot.name}\nCurrent role: ${bot.role || '(none)'}\n\nConversation:\n${tail}`
+    try {
+      const raw = String(await rt.botShot(bot, system, text, { sessionId: bot.sessionId ?? bot.id, kind: 'memory' }) ?? '')
+      const start = raw.indexOf('{')
+      const end = raw.lastIndexOf('}')
+      if (start < 0 || end <= start) return null
+      const parsed = JSON.parse(raw.slice(start, end + 1))
+      const name = typeof parsed?.name === 'string' ? parsed.name.trim().slice(0, 40) : ''
+      const duty = typeof parsed?.duty === 'string' ? parsed.duty.trim().slice(0, 120) : ''
+      return name === '' && duty === '' ? null : { name, duty }
+    } catch (error) {
+      rt.warn('ds-bot: persona suggestion failed: %s', error?.message ?? error)
+      return null
+    }
+  }
+
   const handle = async (endpoint, payload, signal) => {
     try {
       const body = payload ?? {}
@@ -503,6 +542,24 @@ export function install(rt) {
         case 'memory-restore':
           await rt.load()
           return ok(await rt.memoryEndpoint(endpoint, body))
+        // The memory panel: a Session dropped on a Bot is read into that Bot's memory.
+        // The Session itself stays where it was — this only reads it.
+        case 'learn-session': {
+          await rt.load()
+          const bot = rt.findBot(String(body.botId ?? ''))
+          if (bot === undefined) return fail('Unknown Bot', 'bot/not-found')
+          const sessionId = String(body.sessionId ?? '')
+          if (sessionId === '') return fail('No Session to learn from', 'bot/invalid')
+          const transcript = await learnTranscript(sessionId)
+          if (transcript === '') return fail('That Session has nothing to read', 'bot/invalid')
+          // The review maps a Session to its owner; a dropped Session has none, so it is
+          // mapped to the Bot that takes it in.
+          rt.pastOwners.set(sessionId, { botId: bot.id })
+          const learned = await rt.memoryReviewNow(sessionId)
+          const suggestion = await learnPersona(bot, transcript)
+          await rt.save()
+          return ok({ learned, suggestion })
+        }
         case 'learning-answer':
           await rt.load()
           return ok(await rt.learningEndpoint(endpoint, body))

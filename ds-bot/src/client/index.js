@@ -11,6 +11,7 @@ import { TeamSidebar, YouAvatar, AccountLauncher, FooterAccount, BrandMark, Bran
 import { installSettingsShell, SETTINGS_SHELL_CSS } from './settings-shell.js'
 import { frameLayout, readSidebar, writeSidebar, toggledPref, DSH_NARROW } from './frame-layout.js'
 import { SURFACE_SWITCH_CSS, installSurfaceSwitch } from './surface-switch.js'
+import { MEMORY_TAB_ID, MEMORY_TAB_CSS, MemoryTabBody, MemoryTabTitle } from './memory-tab.js'
 import { installFrameWatch } from './frame-watch.js'
 import { HeaderPill } from './header.js'
 import { ComposerPlus, ComposerVoice, menuIcons } from './composer.js'
@@ -1237,6 +1238,41 @@ export function apply(ctx) {
     const dispose = installSurfaceSwitch({ surface, actions })
     return () => { dispose(); style.remove() }
   }, 'ds-bot: surface switch')
+
+  // The memory panel: a right-sidebar tab of the native surface. Unlike the band switch
+  // this one is a real plugin seat — the tab system is a slot family, so the panel is
+  // registered, not placed. The tab service arrives with the shell, so the definition
+  // waits for it instead of being skipped when it is not there yet.
+  ctx.effect(() => {
+    const style = installStyles(MEMORY_TAB_CSS, 'memory-tab')
+    const title = () => (language().startsWith('zh') ? 'DS Bot 记忆' : 'DS Bot memory')
+    const disposers = []
+    disposers.push(ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
+      name: 'sidebar.right.pane.tab', key: MEMORY_TAB_ID, inject: face,
+    }, MemoryTabBody)))
+    disposers.push(ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register({
+      name: 'sidebar.right.pane.tab.title', key: MEMORY_TAB_ID,
+    }, MemoryTabTitle)))
+    return () => {
+      for (const dispose of disposers.reverse()) {
+        try { dispose?.() } catch (error) { console.warn('[ds-bot] memory tab', error) }
+      }
+      style.remove()
+    }
+  }, 'ds-bot: memory tab')
+  ctx.inject(['sidebarRightTabs'], (scope) => {
+    scope.effect(() => scope.sidebarRightTabs.register({
+      id: MEMORY_TAB_ID,
+      kind: MEMORY_TAB_ID,
+      title: () => (language().startsWith('zh') ? 'DS Bot 记忆' : 'DS Bot memory'),
+      guide: [{
+        id: MEMORY_TAB_ID,
+        title: () => (language().startsWith('zh') ? 'DS Bot 记忆' : 'DS Bot memory'),
+        description: () => (language().startsWith('zh') ? '把左侧的会话拖到 Bot 上，它会学习并记住' : 'Drag a session onto a Bot and it learns it'),
+        icon: DsBotNavIcon,
+      }],
+    }), 'ds-bot: memory tab definition')
+  })
 
   // The main view decides `plain`: a DSH Agent Session keeps the Bot shell but
   // withdraws the conversation replacements, so the native dsh page shows. A jump

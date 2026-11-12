@@ -402,5 +402,16 @@ export function installReview(rt, memory) {
     }, 'ds-bot: memory review')
   }
 
-  return { memoryReviews }
+  // Read one conversation into memory on demand: the memory panel's "learn from this
+  // Session" action calls it for a Session the team does not own (the caller maps that
+  // Session to the Bot taking it in first, through pastOwners). Returns the counts the
+  // review wrote, or false when the Session maps to no conversation at all.
+  const reviewNow = async (sessionId) => {
+    const seen = reviewOf(sessionId)
+    if (seen === undefined) return false
+    if (rt.readOnly() !== undefined) throw new Error('this dsh is read-only for the team')
+    return seen.roomId === undefined ? await reviewChat(seen) : await reviewGroup(seen)
+  }
+
+  return { memoryReviews, reviewNow }
 }
