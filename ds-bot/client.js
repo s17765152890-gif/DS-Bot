@@ -22933,6 +22933,9 @@ var MEMORY_TAB_CSS = `
 .bt-mem-entry-src{flex:none;font-size:10px;opacity:.6}
 .bt-mem-more{align-self:flex-start;min-height:22px;padding:0 8px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary,inherit);font:inherit;font-size:11px;cursor:pointer}
 .bt-mem-more:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.18))}
+.bt-mem-new{border-style:dashed;opacity:.75;justify-content:center}
+.bt-mem-new[data-over]{opacity:1}
+.bt-mem-new-plus{font-size:22px;line-height:1;opacity:.7}
 `;
 var avatarSerial = 0;
 function BotAvatar2({ look, size = 40 }) {
@@ -22969,6 +22972,7 @@ function MemoryTabBody(props) {
   const [sources, setSources] = (0, import_react49.useState)({});
   const [memories, setMemories] = (0, import_react49.useState)({});
   const [shown, setShown] = (0, import_react49.useState)({});
+  const [creating, setCreating] = (0, import_react49.useState)(false);
   const bots = roster?.bots ?? [];
   const refreshSources = async () => {
     try {
@@ -22992,7 +22996,7 @@ function MemoryTabBody(props) {
     void refreshSources();
     void refreshMemories();
   }, [bots.length]);
-  const learn = async (botId, sessionId) => {
+  const learn = async (botId, sessionId, fallbackName = "") => {
     setBusy(botId);
     setError("");
     setResult(null);
@@ -23001,7 +23005,7 @@ function MemoryTabBody(props) {
       const bot = bots.find((entry) => entry.id === botId);
       setResult({
         botId,
-        botName: bot?.name ?? "",
+        botName: bot?.name ?? fallbackName,
         title: value?.title ?? "",
         suggestion: value?.suggestion ?? null
       });
@@ -23034,6 +23038,31 @@ function MemoryTabBody(props) {
       setError(String(failure?.message ?? failure));
     }
   };
+  const freeName = () => {
+    const base = say("新成员", "New Bot");
+    const taken = new Set(bots.map((bot) => bot.name));
+    if (!taken.has(base)) return base;
+    for (let index = 2; index < 100; index += 1) {
+      const name = `${base} ${index}`;
+      if (!taken.has(name)) return name;
+    }
+    return `${base} ${Date.now() % 1e3}`;
+  };
+  const createAndLearn = async (sessionId) => {
+    setCreating(true);
+    setError("");
+    setResult(null);
+    try {
+      const created = await call("create-bot", { name: freeName() });
+      const botId = created?.id;
+      if (typeof botId !== "string" || botId === "") throw new Error(say("新建 Bot 没有返回 id", "Creating a Bot returned no id"));
+      await learn(botId, sessionId, created?.name ?? "");
+    } catch (failure) {
+      setError(String(failure?.message ?? failure));
+    } finally {
+      setCreating(false);
+    }
+  };
   const nameOf2 = (botId) => bots.find((bot) => bot.id === botId)?.name ?? botId;
   const rows2 = Object.entries(sources).flatMap(([botId, list]) => (Array.isArray(list) ? list : []).map((row) => ({ botId, ...row }))).sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
   const openSession = (sessionId) => {
@@ -23042,7 +23071,7 @@ function MemoryTabBody(props) {
     } catch {
     }
   };
-  const cards = useRoster === null ? null : bots.length === 0 ? (0, import_react49.createElement)("div", { className: "bt-mem-empty" }, say("团队还没有 Bot。", "The team has no Bots yet.")) : (0, import_react49.createElement)("div", { className: "bt-mem-grid" }, bots.map((bot) => (0, import_react49.createElement)(
+  const botCards = bots.map((bot) => (0, import_react49.createElement)(
     "div",
     {
       key: bot.id,
@@ -23062,7 +23091,35 @@ function MemoryTabBody(props) {
     (0, import_react49.createElement)(BotAvatar2, { look: lookOfBot(bot), size: 40 }),
     (0, import_react49.createElement)("div", { className: "bt-mem-name" }, bot.name),
     bot.role ? (0, import_react49.createElement)("div", { className: "bt-mem-role" }, bot.role) : null
-  )));
+  ));
+  const newCard = (0, import_react49.createElement)(
+    "div",
+    {
+      key: "__new__",
+      className: "bt-mem-card bt-mem-new",
+      "data-over": over === "__new__" ? "" : void 0,
+      "data-busy": creating ? "" : void 0,
+      onDragOver: (event) => {
+        event.preventDefault();
+        if (event.dataTransfer !== null) event.dataTransfer.dropEffect = "copy";
+        if (over !== "__new__") setOver("__new__");
+      },
+      onDragLeave: () => {
+        if (over === "__new__") setOver(null);
+      },
+      onDrop: (event) => {
+        event.preventDefault();
+        setOver(null);
+        const sessionId = event.dataTransfer?.getData("text/plain") ?? "";
+        if (sessionId === "") return;
+        void createAndLearn(sessionId);
+      }
+    },
+    (0, import_react49.createElement)("div", { className: "bt-mem-new-plus" }, "＋"),
+    (0, import_react49.createElement)("div", { className: "bt-mem-name" }, say("新建 Bot", "New Bot"))
+  );
+  const cards = useRoster === null ? null : (0, import_react49.createElement)("div", { className: "bt-mem-grid" }, [...botCards, newCard]);
+  const emptyNote = useRoster !== null && bots.length === 0 ? (0, import_react49.createElement)("div", { className: "bt-mem-empty" }, say("团队还没有 Bot。把会话拖到下面的「新建 Bot」就能创建一个。", "No Bots yet - drop a session on the new seat below to make one.")) : null;
   const suggestion = result !== null && result.suggestion !== null ? (0, import_react49.createElement)(
     "div",
     { className: "bt-mem-suggest" },
@@ -23159,6 +23216,7 @@ function MemoryTabBody(props) {
       (0, import_react49.createElement)("div", { className: "bt-mem-hint" }, say("把左侧的会话拖到某个 Bot 上，它会读完并记住；会话本身留在原处。", "Drag a session from the left onto a Bot: it reads it into memory and the session stays where it was."))
     ),
     useRoster === null ? (0, import_react49.createElement)("div", { className: "bt-mem-error" }, say("面板没拿到团队数据（hooks 未注入）。把这句话告诉我，我去改注册方式。", "The panel got no team data (hooks not injected). Tell me this line and I will fix the registration.")) : null,
+    emptyNote,
     cards,
     busy !== null ? (0, import_react49.createElement)("div", { className: "bt-mem-note" }, say("正在读这个会话…", "Reading the session…")) : null,
     error !== "" ? (0, import_react49.createElement)("div", { className: "bt-mem-error" }, error) : null,

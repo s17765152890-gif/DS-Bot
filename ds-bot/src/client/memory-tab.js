@@ -61,6 +61,9 @@ export const MEMORY_TAB_CSS = `
 .bt-mem-entry-src{flex:none;font-size:10px;opacity:.6}
 .bt-mem-more{align-self:flex-start;min-height:22px;padding:0 8px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary,inherit);font:inherit;font-size:11px;cursor:pointer}
 .bt-mem-more:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.18))}
+.bt-mem-new{border-style:dashed;opacity:.75;justify-content:center}
+.bt-mem-new[data-over]{opacity:1}
+.bt-mem-new-plus{font-size:22px;line-height:1;opacity:.7}
 `
 
 let avatarSerial = 0
@@ -106,6 +109,7 @@ export function MemoryTabBody(props) {
   const [sources, setSources] = useState({})
   const [memories, setMemories] = useState({})
   const [shown, setShown] = useState({})
+  const [creating, setCreating] = useState(false)
   const bots = roster?.bots ?? []
 
   const refreshSources = async () => {
@@ -126,7 +130,7 @@ export function MemoryTabBody(props) {
     void refreshMemories()
   }, [bots.length])
 
-  const learn = async (botId, sessionId) => {
+  const learn = async (botId, sessionId, fallbackName = '') => {
     setBusy(botId)
     setError('')
     setResult(null)
@@ -135,7 +139,7 @@ export function MemoryTabBody(props) {
       const bot = bots.find(entry => entry.id === botId)
       setResult({
         botId,
-        botName: bot?.name ?? '',
+        botName: bot?.name ?? fallbackName,
         title: value?.title ?? '',
         suggestion: value?.suggestion ?? null,
       })
@@ -171,6 +175,35 @@ export function MemoryTabBody(props) {
     }
   }
 
+  // A name the team does not use yet: a create is refused on a taken name, and the Bot
+  // is meant to be renamed by the suggestion anyway.
+  const freeName = () => {
+    const base = say('新成员', 'New Bot')
+    const taken = new Set(bots.map(bot => bot.name))
+    if (!taken.has(base)) return base
+    for (let index = 2; index < 100; index += 1) {
+      const name = `${base} ${index}`
+      if (!taken.has(name)) return name
+    }
+    return `${base} ${Date.now() % 1000}`
+  }
+
+  const createAndLearn = async (sessionId) => {
+    setCreating(true)
+    setError('')
+    setResult(null)
+    try {
+      const created = await call('create-bot', { name: freeName() })
+      const botId = created?.id
+      if (typeof botId !== 'string' || botId === '') throw new Error(say('新建 Bot 没有返回 id', 'Creating a Bot returned no id'))
+      await learn(botId, sessionId, created?.name ?? '')
+    } catch (failure) {
+      setError(String(failure?.message ?? failure))
+    } finally {
+      setCreating(false)
+    }
+  }
+
   const nameOf = (botId) => bots.find(bot => bot.id === botId)?.name ?? botId
   const rows = Object.entries(sources)
     .flatMap(([botId, list]) => (Array.isArray(list) ? list : []).map(row => ({ botId, ...row })))
@@ -180,26 +213,52 @@ export function MemoryTabBody(props) {
     try { props.actions.show(sessionId) } catch { /* the session may be gone */ }
   }
 
+  const botCards = bots.map(bot => h('div', {
+    key: bot.id,
+    className: 'bt-mem-card',
+    'data-over': over === bot.id ? '' : undefined,
+    'data-busy': busy === bot.id ? '' : undefined,
+    onDragOver: (event) => {
+      event.preventDefault()
+      if (event.dataTransfer !== null) event.dataTransfer.dropEffect = 'copy'
+      if (over !== bot.id) setOver(bot.id)
+    },
+    onDragLeave: () => { if (over === bot.id) setOver(null) },
+    onDrop: (event) => onDrop(event, bot.id),
+  },
+  h(BotAvatar, { look: lookOfBot(bot), size: 40 }),
+  h('div', { className: 'bt-mem-name' }, bot.name),
+  bot.role ? h('div', { className: 'bt-mem-role' }, bot.role) : null))
+
+  // The empty seat at the end of the row: dropping here makes a Bot, then teaches it.
+  const newCard = h('div', {
+    key: '__new__',
+    className: 'bt-mem-card bt-mem-new',
+    'data-over': over === '__new__' ? '' : undefined,
+    'data-busy': creating ? '' : undefined,
+    onDragOver: (event) => {
+      event.preventDefault()
+      if (event.dataTransfer !== null) event.dataTransfer.dropEffect = 'copy'
+      if (over !== '__new__') setOver('__new__')
+    },
+    onDragLeave: () => { if (over === '__new__') setOver(null) },
+    onDrop: (event) => {
+      event.preventDefault()
+      setOver(null)
+      const sessionId = event.dataTransfer?.getData('text/plain') ?? ''
+      if (sessionId === '') return
+      void createAndLearn(sessionId)
+    },
+  },
+  h('div', { className: 'bt-mem-new-plus' }, '＋'),
+  h('div', { className: 'bt-mem-name' }, say('新建 Bot', 'New Bot')))
+
   const cards = useRoster === null
     ? null
-    : bots.length === 0
-      ? h('div', { className: 'bt-mem-empty' }, say('团队还没有 Bot。', 'The team has no Bots yet.'))
-      : h('div', { className: 'bt-mem-grid' }, bots.map(bot => h('div', {
-        key: bot.id,
-        className: 'bt-mem-card',
-        'data-over': over === bot.id ? '' : undefined,
-        'data-busy': busy === bot.id ? '' : undefined,
-        onDragOver: (event) => {
-          event.preventDefault()
-          if (event.dataTransfer !== null) event.dataTransfer.dropEffect = 'copy'
-          if (over !== bot.id) setOver(bot.id)
-        },
-        onDragLeave: () => { if (over === bot.id) setOver(null) },
-        onDrop: (event) => onDrop(event, bot.id),
-      },
-      h(BotAvatar, { look: lookOfBot(bot), size: 40 }),
-      h('div', { className: 'bt-mem-name' }, bot.name),
-      bot.role ? h('div', { className: 'bt-mem-role' }, bot.role) : null)))
+    : h('div', { className: 'bt-mem-grid' }, [...botCards, newCard])
+  const emptyNote = useRoster !== null && bots.length === 0
+    ? h('div', { className: 'bt-mem-empty' }, say('团队还没有 Bot。把会话拖到下面的「新建 Bot」就能创建一个。', 'No Bots yet - drop a session on the new seat below to make one.'))
+    : null
 
   const suggestion = result !== null && result.suggestion !== null
     ? h('div', { className: 'bt-mem-suggest' },
@@ -280,6 +339,7 @@ export function MemoryTabBody(props) {
     useRoster === null
       ? h('div', { className: 'bt-mem-error' }, say('面板没拿到团队数据（hooks 未注入）。把这句话告诉我，我去改注册方式。', 'The panel got no team data (hooks not injected). Tell me this line and I will fix the registration.'))
       : null,
+    emptyNote,
     cards,
     busy !== null ? h('div', { className: 'bt-mem-note' }, say('正在读这个会话…', 'Reading the session…')) : null,
     error !== '' ? h('div', { className: 'bt-mem-error' }, error) : null,
