@@ -1,7 +1,7 @@
 // Client channel: the team view the browser renders, and the POST /api/bot endpoints.
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { readLearned, noteLearned } from './learned.js'
+import { readSessionText } from './session-text.js'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { install as installBtw } from './btw.js'
 import { install as installSide } from './side.js'
@@ -202,43 +202,11 @@ export function install(rt) {
     return rt.save()
   }
 
+  const LEARN_PROMPT_MAX = 6_000
   // Learning from a Session the team does not own: the memory panel drops a Session on
   // a Bot. The Bot's own memory review reads it, and its model suggests who the Bot
   // became. The suggestion is only a suggestion — a name the user wrote themselves is
   // never overwritten by it.
-  const LEARN_READ_MS = 20_000
-  const LEARN_TEXT_MAX = 14_000
-  const LEARN_PROMPT_MAX = 6_000
-  // A Session's title, for the panel's "learned from" rows. The sessions service comes
-  // in two shapes across DSH versions — a snapshot store (`list.getSnapshot().byId`) and
-  // a callable list (`list()`) — so both are tried. A title is cosmetic: any failure
-  // yields '', never an error for the caller.
-  const sessionTitleOf = async (sessionId) => {
-    const sessions = ctx?.sessions
-    const list = sessions?.list
-    try {
-      if (typeof list === 'function') {
-        let rows = list.call(sessions)
-        if (rows !== null && typeof rows?.then === 'function') rows = await rows
-        if (Array.isArray(rows)) {
-          const row = rows.find(item => (item?.id ?? item?.header?.id) === sessionId)
-          if (row !== undefined) return String(row.title ?? row.header?.title ?? '')
-        }
-      }
-      const byId = typeof list?.getSnapshot === 'function' ? (list.getSnapshot()?.byId ?? {}) : {}
-      return String(byId[sessionId]?.title ?? '')
-    } catch { return '' }
-  }
-  const learnTranscript = async (sessionId) => {
-    const lines = []
-    for await (const line of rt.partLines(sessionId, AbortSignal.timeout(LEARN_READ_MS), { pages: Infinity })) {
-      const who = line.who === 'user' ? 'User' : line.who === 'you' ? 'Bot' : String(line.who ?? 'Other')
-      const text = String(line.text ?? '').trim()
-      if (text !== '') lines.push(`${who}: ${text}`)
-    }
-    const joined = lines.join('\n')
-    return joined.length > LEARN_TEXT_MAX ? joined.slice(-LEARN_TEXT_MAX) : joined
-  }
   const learnPersona = async (bot, transcript) => {
     const zh = String(uiLocale ?? '').startsWith('zh')
     const system = zh
@@ -258,29 +226,6 @@ export function install(rt) {
     } catch (error) {
       rt.warn('ds-bot: persona suggestion failed: %s', error?.message ?? error)
       return null
-    }
-  }
-
-  // Which Sessions each Bot learned from, newest first. Kept beside the memory so the
-  // panel can send the user back to the original conversation, and so a Bot can be sent
-  // back to read more of it later.
-  const learnedPath = () => join(rt.home, 'memory', 'learned.json')
-  const readLearned = () => {
-    try {
-      const value = JSON.parse(readFileSync(learnedPath(), 'utf8'))
-      return value !== null && typeof value === 'object' && !Array.isArray(value) ? value : {}
-    } catch { return {} }
-  }
-  const noteLearned = (botId, sessionId, title) => {
-    const all = readLearned()
-    const rows = (Array.isArray(all[botId]) ? all[botId] : []).filter(row => row?.sessionId !== sessionId)
-    rows.unshift({ sessionId, title: String(title ?? ''), at: Date.now() })
-    all[botId] = rows.slice(0, 40)
-    try {
-      mkdirSync(join(rt.home, 'memory'), { recursive: true })
-      writeFileSync(learnedPath(), JSON.stringify(all, null, 2))
-    } catch (error) {
-      rt.warn('ds-bot: learned sources could not be saved: %s', error?.message ?? error)
     }
   }
 
@@ -595,14 +540,14 @@ export function install(rt) {
           if (bot === undefined) return fail('Unknown Bot', 'bot/not-found')
           const sessionId = String(body.sessionId ?? '')
           if (sessionId === '') return fail('No Session to learn from', 'bot/invalid')
-          const transcript = await learnTranscript(sessionId)
+          const transcript = await readSessionText(rt, sessionId)
           if (transcript === '') return fail('That Session has nothing to read', 'bot/invalid')
           // The review maps a Session to its owner; a dropped Session has none, so it is
           // mapped to the Bot that takes it in.
           rt.pastOwners.set(sessionId, { botId: bot.id })
           const learned = await rt.memoryReviewNow(sessionId, { sourceTag: `session:${sessionId}` })
           const title = await sessionTitleOf(sessionId)
-          noteLearned(bot.id, sessionId, title)
+          noteLearned(rt, bot.id, sessionId, title)
           const suggestion = await learnPersona(bot, transcript)
           await rt.save()
           return ok({ learned, suggestion, title })
@@ -611,7 +556,7 @@ export function install(rt) {
         // go back to the original conversation, and learn more from it later.
         case 'learned-sources':
           await rt.load()
-          return ok(readLearned())
+          return ok(readLearned(rt))
         case 'learning-answer':
           await rt.load()
           return ok(await rt.learningEndpoint(endpoint, body))

@@ -39,6 +39,8 @@ import { GROUP_HEADING, GROUP_MEMORY_SOURCE, MEMORY_RECALL_SOURCE, MEMORY_UPDATE
 import { installReview } from './memory-review.js'
 import { installTidy } from './memory-tidy.js'
 import { output } from './tools.js'
+import { learnedOf } from './learned.js'
+import { readSessionText } from './session-text.js'
 
 export { MEMORY_LIMITS, addLink, cleanEntry, cleanTopic, formatEntry, insertEntry, looksLikeKey, looksSecret, matchEntries, parseAsk, parseMemory, parseReview, removeLink, reviewEntries, splitMeta } from './memory-entries.js'
 export { writtenIn } from './memory-copy.js'
@@ -1061,6 +1063,33 @@ export function install(rt) {
   const writeFailure = failure => failure instanceof MemoryWriteError
     ? failure
     : new MemoryWriteError(failure?.message ?? String(failure), ROUTED.has(failure?.code) ? failure.code : FAILED)
+
+  // A Session a Bot learned from is still where it was. This reads it again on demand, so
+  // a Bot that does not remember something can go back to the conversation instead of
+  // guessing. It only reads: the Session is never moved, and what the Bot says about it
+  // afterwards is what the usual review keeps.
+  rt.teamTools.push(defineTool({
+    name: 'learn_from_session',
+    description: 'Read a Session you learned from, to check something you do not remember. The id is the part after "session:" in the source of one of your memories. This only reads the conversation; nothing is moved.',
+    parameters: {
+      sessionId: { type: 'string', required: true, description: 'The id after "session:" in a memory entry source' },
+      question: { type: 'string', description: 'What you are trying to find out. The end of the conversation is read either way' },
+    },
+    output,
+    async execute(args, exec) {
+      await rt.load()
+      const caller = callerOf(exec)
+      if (caller === undefined) return 'Only Bots on the team keep a memory.'
+      const self = caller.bot.id
+      const sessionId = String(args.sessionId ?? '').trim()
+      if (sessionId === '') return 'Which Session? Give the id after "session:" in a memory source.'
+      const row = learnedOf(rt, self).find(item => item.sessionId === sessionId)
+      if (row === undefined) return `You have not learned from Session ${sessionId}. Use the source of one of your own memories.`
+      const text = await readSessionText(rt, sessionId)
+      if (text === '') return 'That Session has nothing to read.'
+      return [`Session${row.title ? ` "${row.title}"` : ''} (${sessionId}), oldest first, tail kept:`, '', text].join('\n')
+    },
+  }))
 
   rt.teamTools.push(defineTool({
     name: 'remember',
