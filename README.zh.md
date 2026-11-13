@@ -11,7 +11,7 @@
 
 > **这是个人分支，不是上游原版。** 分支 **`feat/dual-surface-switch`**，来自 [Fei2411/DS-Bot](https://github.com/Fei2411/DS-Bot)。它只做一件事：**DS Bot 模式和原生 DSH 模式自由切换**——谁都不替代谁。
 
-![版本](https://img.shields.io/badge/版本-v0.3_预览-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.1-4D6BFE) ![许可](https://img.shields.io/badge/许可-Apache_2.0-green)
+![版本](https://img.shields.io/badge/版本-v0.4_预览-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.1-4D6BFE) ![许可](https://img.shields.io/badge/许可-Apache_2.0-green)
 
 DS Bot 是一个基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（简称 dsh）的开源项目，提供独立桌面应用和 dsh 插件两种形态。它将 dsh 改造为 bot 形式，你可以与自己创建的 bot 交流、工作。
 
@@ -23,6 +23,19 @@ DS Bot 是一个基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepsee
 - **左侧栏面板列表里多一行 DS Bot**（鲸鱼图标），排在「插件」和「技能」之间。点它不是切换面板，而是进入 DS Bot。
 - **首次安装直接进原生界面**，插件不会在你第一次打开时就把工作区藏起来；切换过一次后会记住选择。
 - **设置各归各的**：原生模式用 DSH 自己的设置弹窗，Bot 模式用 DS Bot 的。
+
+### 记忆面板：把会话「学」进 Bot
+
+右侧栏多了一个 **DS Bot 记忆** 页签，在原生界面里就能用：
+
+- 一排 Bot 卡片，形象就是 Bot 自己的角色；卡片横向滚动，点一个只看它自己的内容
+- **把左侧任意会话拖到某个 Bot 上**——普通会话、置顶文件夹里的、置顶的单条都行。悬停时卡片先亮起光环和粒子"蓄力"，松手后光波向内收缩、粒子被吸入、头像咕咚一下
+- 该 Bot 用**自己的模型**读完这条会话，产出几条记忆写进它自己的记忆库（沿用 DS Bot 原有的格式、上限、去重与密钥过滤）
+- 学完给出**人设建议**（名字 + 一句职责），**点采纳才改写**——你手写的名字和职责不会被覆盖
+- 拖到末尾的 **＋ 新建 Bot** 会先建一个 Bot 再学，可以当场采纳建议命名
+- **学过的会话**按 Bot 列出：**跳转**回原会话、**再学**只学新增内容。原会话始终留在原处，从不被搬动
+- 面板顶部可以选**新建 Bot 的默认模型**（只影响之后新建的 Bot；已有 Bot 的模型在它自己的设置里改）
+- Bot 自己也能回去补课：记忆条目带 `session:<id>` 来源，Bot 可调用 `learn_from_session` 读回原文——只读，记忆仍由审核决定
 
 已发布为 npm 上的 [`ds-bot-dual-surface`](https://www.npmjs.com/package/ds-bot-dual-surface)，和上游的 `ds-bot` 并存，不会互相覆盖：
 

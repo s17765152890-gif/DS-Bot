@@ -11,7 +11,7 @@ English | [中文](README.zh.md)
 
 > **This is a personal fork, not upstream.** Branch **`feat/dual-surface-switch`** of [Fei2411/DS-Bot](https://github.com/Fei2411/DS-Bot). Its one idea: **DS Bot mode and the native DSH mode switch freely** — neither one replaces the other.
 
-![version](https://img.shields.io/badge/version-v0.3_preview-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.1-4D6BFE) ![license](https://img.shields.io/badge/license-Apache_2.0-green)
+![version](https://img.shields.io/badge/version-v0.4_preview-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.1-4D6BFE) ![license](https://img.shields.io/badge/license-Apache_2.0-green)
 
 DS Bot is an open-source project built on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH), available as a standalone desktop app or as a DSH plugin. It turns DSH into bots that you create, talk to and work with.
 
@@ -23,6 +23,19 @@ Upstream DS Bot takes the window over when it is installed — the bot team repl
 - **A row in the sidebar's panel list**, between Plugins and Skills, wearing the team's whale. Clicking it enters DS Bot instead of selecting a panel.
 - **A fresh install opens on the native surface**, so the plugin never hides your own workspace on first run. The choice is remembered once you switch.
 - **Settings stay with their own surface**: the native one keeps DSH's own Settings dialog, the bot one keeps DS Bot's.
+
+### The memory panel: teaching a Session to a Bot
+
+The native surface gets a **DS Bot memory** tab in the right sidebar:
+
+- A sideways row of Bot cards, each wearing its own character. Pick one to see only its Sessions and its memories.
+- **Drag any Session from the left onto a Bot** — a plain one, one inside a pinned folder, or a pinned Session on its own. While it hovers the card already breathes a ring and pulls particles inward; on drop the ring contracts, the particles are taken in and the mark gulps.
+- That Bot reads the Session **with its own model** and writes a few memories into its own memory, following DS Bot's existing format, limits, dedupe and secret rules.
+- It then suggests **who it became** (a name and one line of duty). Nothing is rewritten until you **adopt** it, so a name you wrote yourself stays.
+- Drop on the **＋ New Bot** seat to make a Bot and teach it in one move, then adopt the suggested name.
+- **Sessions learned** lists what each Bot has read: **Open** returns to the original conversation, **Relearn** reads only what is new. The Session itself is never moved.
+- The top of the panel picks the **default model for a new Bot** (it only affects Bots created later; an existing Bot changes its own model in its settings).
+- A Bot can go back on its own: memory entries carry their origin as `session:<id>`, and the Bot may call `learn_from_session` to read that conversation again — read only, memory still goes through the review.
 
 Published as [`ds-bot-dual-surface`](https://www.npmjs.com/package/ds-bot-dual-surface) on npm, so it installs beside upstream's `ds-bot` instead of replacing it:
 
