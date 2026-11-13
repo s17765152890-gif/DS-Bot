@@ -1449,3 +1449,20 @@ export function installCompiledStyles(text, tag) {
     style.remove()
   }
 }
+
+// The mark's own base rules and the per-colour ink variables, installed in both
+// surfaces: the Bot surface's stylesheet only mounts with that surface, but a mark drawn
+// in the native surface (the memory tab's cards) must still look like itself.
+export const MARK_CSS = `
+${Object.entries(INKS).map(([name, [light]]) => `body{--bt-ink-${name}:${light}}`).join('')}
+${Object.entries(INKS).map(([name, [, dark]]) => `body[data-ds-dark-theme]{--bt-ink-${name}:${dark}}`).join('')}
+.bt-mark{display:inline-block;flex:none;position:relative;line-height:0}
+.bt-mark svg{width:100%;height:100%;overflow:visible}
+.bt-mark .bt-b,.bt-mark .bt-eye,.bt-mark .bt-eyes,.bt-mark .bt-gaze{transform-box:fill-box}
+.bt-mark .bt-b{transform-origin:50% 100%}
+.bt-mark .bt-eye,.bt-mark .bt-eyes{transform-origin:center}
+.bt-mark[data-live] .bt-b,.bt-mark[data-live] .bt-mark-img{transition:rotate .5s cubic-bezier(.34,1.56,.64,1),translate .5s cubic-bezier(.34,1.56,.64,1),scale .3s ease-out}
+.bt-mark[data-live] .bt-eye{transition:scale .14s ease-in}
+.bt-mark[data-live] .bt-eye-happy{transition:opacity .12s ease-out}
+@keyframes bt-nuzzle{50%{rotate:14deg;translate:8% -3%;scale:1.03 .97}}
+`

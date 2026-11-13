@@ -5,7 +5,7 @@ import { createSource, EMPTY_ROSTER, indexRoster, isAgentSession } from './sourc
 import { teamActions } from './team-actions.js'
 import { themeCss, shellTokens, registry, registerShape, registerTheme, allThemes, layoutOf, widthOf, flatWidthOf } from './themes.js'
 import { MENTION_ORIGIN, currentPart } from './text.js'
-import { SHELL_CSS, CONVERSATION_CSS, botOwnCss, installStyles, installCompiledStyles } from './styles.js'
+import { SHELL_CSS, CONVERSATION_CSS, MARK_CSS, botOwnCss, installStyles, installCompiledStyles } from './styles.js'
 import { lookOf } from './mark.js'
 import { TeamSidebar, YouAvatar, AccountLauncher, FooterAccount, BrandMark, BrandName, DsBotNavIcon, SIDEBAR_CSS, holdShellShortcuts } from './sidebar.js'
 import { installSettingsShell, SETTINGS_SHELL_CSS } from './settings-shell.js'
@@ -1244,6 +1244,10 @@ export function apply(ctx) {
   // this one is a real plugin seat — the tab system is a slot family, so the panel is
   // registered, not placed. The tab service arrives with the shell, so the definition
   // waits for it instead of being skipped when it is not there yet.
+  ctx.effect(() => {
+    const style = installStyles(MARK_CSS, 'mark-base')
+    return () => style.remove()
+  }, 'ds-bot: mark base styles')
   ctx.effect(() => {
     const style = installStyles(MEMORY_TAB_CSS, 'memory-tab')
     const title = () => (language().startsWith('zh') ? 'DS Bot 记忆' : 'DS Bot memory')
