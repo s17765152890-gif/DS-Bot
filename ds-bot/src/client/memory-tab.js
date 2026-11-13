@@ -23,6 +23,14 @@ const ENTRIES_SHOWN = 6
 
 const zh = () => language().startsWith('zh')
 const say = (zhText, enText) => (zh() ? zhText : enText)
+// A refusal from the model provider is not a bug in the panel: say what to do about it.
+const friendly = (failure) => {
+  const text = String(failure?.message ?? failure)
+  if (/insufficient balance|insufficient_quota|exceeded your current quota|402/i.test(text)) {
+    return say('这个 Bot 的模型余额不足（Insufficient Balance），这次学不了。给它的模型充值，或换一个能用的模型再试。', "That Bot's model has no credit left (Insufficient Balance). Top it up, or give the Bot another model, then try again.")
+  }
+  return text
+}
 
 export const MEMORY_TAB_CSS = `
 .bt-mem{display:flex;flex-direction:column;gap:12px;padding:14px 12px;height:100%;overflow:auto;font-family:var(--dsw-font-family,inherit);color:var(--dsw-alias-label-primary,inherit);font-size:13px;line-height:1.5;box-sizing:border-box}
@@ -85,7 +93,12 @@ body[data-bt-motion=quiet] .bt-mem-card:hover .bt-mark .bt-b{animation:none;rota
 @keyframes bt-mem-suck-wave{0%{transform:scale(2.6);opacity:0}18%{opacity:1}70%{opacity:.75}100%{transform:scale(.18);opacity:0}}
 @keyframes bt-mem-suck-bit{0%{transform:translate(var(--dx),var(--dy)) scale(1.15);opacity:0}12%{opacity:1}70%{opacity:.9}100%{transform:translate(0,0) scale(.05);opacity:0}}
 @keyframes bt-mem-gulp{0%{transform:scale(1)}38%{transform:scale(1.14)}66%{transform:scale(.9)}100%{transform:scale(1)}}
-@media (prefers-reduced-motion: reduce){.bt-mem-particle{display:none}}
+.bt-mem-aura{position:absolute;inset:-12px;pointer-events:none;z-index:2;overflow:visible}
+.bt-mem-aura-ring{position:absolute;left:50%;top:30px;width:104px;height:104px;margin:-52px 0 0 -52px;border-radius:50%;border:2px dashed color-mix(in srgb,var(--dsw-alias-state-business-primary,#4D6BFE) 70%,transparent);box-shadow:0 0 16px 1px color-mix(in srgb,var(--dsw-alias-state-business-primary,#4D6BFE) 35%,transparent);animation:bt-mem-aura-pulse 1.5s ease-in-out infinite}
+.bt-mem-hbit{position:absolute;left:50%;top:30px;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:var(--dsw-alias-state-business-primary,#4D6BFE);box-shadow:0 0 7px 1px color-mix(in srgb,var(--dsw-alias-state-business-primary,#4D6BFE) 55%,transparent);opacity:0;animation:bt-mem-hbit 1.45s cubic-bezier(.45,0,.35,1) infinite;animation-delay:calc(var(--i,0) * -0.18s)}
+@keyframes bt-mem-aura-pulse{0%,100%{transform:scale(.9) rotate(0deg);opacity:.35}50%{transform:scale(1.08) rotate(180deg);opacity:.8}}
+@keyframes bt-mem-hbit{0%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:0}20%{opacity:.9}100%{transform:translate(0,0) scale(.15);opacity:0}}
+@media (prefers-reduced-motion: reduce){.bt-mem-particle,.bt-mem-hbit{display:none}}
 `
 
 // A learned entry carries its origin as `session:<id>`; anything else (a Bot's own chat,
@@ -183,6 +196,20 @@ export function MemoryTabBody(props) {
       },
     }))))
 
+  // While a Session is held over a card, the card is already breathing and pulling
+  // particles inward; the drop is the burst that finishes it.
+  const aura = (key) => (over !== key || eating === key ? null : h('span', { className: 'bt-mem-aura', 'aria-hidden': true },
+    h('span', { className: 'bt-mem-aura-ring' }),
+    ...Array.from({ length: 8 }, (_, index) => h('span', {
+      key: index,
+      className: 'bt-mem-hbit',
+      style: {
+        '--dx': `${Math.round(Math.cos((index / 8) * Math.PI * 2) * 54)}px`,
+        '--dy': `${Math.round(Math.sin((index / 8) * Math.PI * 2) * 54)}px`,
+        '--i': index,
+      },
+    }))))
+
   const learn = async (botId, sessionId, fallbackName = '') => {
     startEating(botId)
     setBusy(botId)
@@ -201,7 +228,7 @@ export function MemoryTabBody(props) {
       void refreshSources()
       void refreshMemories(botId)
     } catch (failure) {
-      setError(String(failure?.message ?? failure))
+      setError(friendly(failure))
     } finally {
       setBusy(null)
     }
@@ -227,7 +254,7 @@ export function MemoryTabBody(props) {
       })
       setResult(null)
     } catch (failure) {
-      setError(String(failure?.message ?? failure))
+      setError(friendly(failure))
     }
   }
 
@@ -254,7 +281,7 @@ export function MemoryTabBody(props) {
       if (typeof botId !== 'string' || botId === '') throw new Error(say('新建 Bot 没有返回 id', 'Creating a Bot returned no id'))
       await learn(botId, sessionId, created?.name ?? '')
     } catch (failure) {
-      setError(String(failure?.message ?? failure))
+      setError(friendly(failure))
     } finally {
       setCreating(false)
     }
@@ -287,6 +314,7 @@ export function MemoryTabBody(props) {
   h('span', { className: 'bt-mem-mark' }, h(BotMark, { bot, size: 40, live: true })),
   h('div', { className: 'bt-mem-name' }, bot.name),
   bot.role ? h('div', { className: 'bt-mem-role' }, bot.role) : null,
+  aura(bot.id),
   intake(bot.id)))
 
   // The empty seat at the end of the row: dropping here makes a Bot, then teaches it.
@@ -313,6 +341,7 @@ export function MemoryTabBody(props) {
   },
   h('div', { className: 'bt-mem-new-plus' }, '＋'),
   h('div', { className: 'bt-mem-name' }, say('新建 Bot', 'New Bot')),
+  aura('__new__'),
   intake('__new__'))
 
   const grid = useRoster === null
