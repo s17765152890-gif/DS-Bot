@@ -22961,14 +22961,16 @@ var MEMORY_TAB_CSS = `
 .bt-mem-card:hover .bt-mark[data-live][data-state=idle] .bt-eye{scale:1 0;animation:none}
 .bt-mem-card:hover .bt-mark[data-live][data-state=idle] .bt-eye-happy{opacity:1;transition-delay:.1s}
 body[data-bt-motion=quiet] .bt-mem-card:hover .bt-mark .bt-b{animation:none;rotate:0deg;translate:0 0}
-.bt-mem-card[data-eating] .bt-mem-mark{animation:bt-mem-gulp .64s cubic-bezier(.3,0,.2,1)}
-.bt-mem-suck{position:absolute;inset:0;pointer-events:none;z-index:2}
-.bt-mem-wave{position:absolute;left:50%;top:30px;width:76px;height:76px;margin:-38px 0 0 -38px;border-radius:50%;border:2px solid var(--dsw-alias-state-business-primary,#4D6BFE);opacity:0;animation:bt-mem-suck-wave .68s cubic-bezier(.4,0,.2,1) forwards}
-.bt-mem-particle{position:absolute;left:50%;top:30px;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:var(--dsw-alias-state-business-primary,#4D6BFE);opacity:0;animation:bt-mem-suck-bit .68s ease-in forwards;animation-delay:calc(var(--i,0) * 26ms)}
-@keyframes bt-mem-suck-wave{0%{transform:scale(2.5);opacity:0}22%{opacity:.85}100%{transform:scale(.22);opacity:0}}
-@keyframes bt-mem-suck-bit{0%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:.95}72%{opacity:.75}100%{transform:translate(0,0) scale(.1);opacity:0}}
+.bt-mem-card[data-eating]{animation:bt-mem-glow .95s ease-out}
+.bt-mem-card[data-eating] .bt-mem-mark{animation:bt-mem-gulp .8s cubic-bezier(.3,0,.2,1)}
+@keyframes bt-mem-glow{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--dsw-alias-state-business-primary,#4D6BFE) 45%,transparent)}45%{box-shadow:0 0 22px 4px color-mix(in srgb,var(--dsw-alias-state-business-primary,#4D6BFE) 45%,transparent)}100%{box-shadow:0 0 0 0 transparent}}
+.bt-mem-suck{position:absolute;inset:-14px;pointer-events:none;z-index:3;overflow:visible}
+.bt-mem-wave{position:absolute;left:50%;top:30px;width:112px;height:112px;margin:-56px 0 0 -56px;border-radius:50%;border:3px solid var(--dsw-alias-state-business-primary,#4D6BFE);box-shadow:0 0 18px 2px color-mix(in srgb,var(--dsw-alias-state-business-primary,#4D6BFE) 55%,transparent),inset 0 0 14px 1px color-mix(in srgb,var(--dsw-alias-state-business-primary,#4D6BFE) 45%,transparent);opacity:0;animation:bt-mem-suck-wave .95s cubic-bezier(.35,0,.25,1) forwards}
+.bt-mem-particle{position:absolute;left:50%;top:30px;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:var(--dsw-alias-state-business-primary,#4D6BFE);box-shadow:0 0 8px 1px color-mix(in srgb,var(--dsw-alias-state-business-primary,#4D6BFE) 60%,transparent);opacity:0;animation:bt-mem-suck-bit .9s cubic-bezier(.4,0,.3,1) forwards;animation-delay:calc(var(--i,0) * 24ms)}
+@keyframes bt-mem-suck-wave{0%{transform:scale(2.6);opacity:0}18%{opacity:1}70%{opacity:.75}100%{transform:scale(.18);opacity:0}}
+@keyframes bt-mem-suck-bit{0%{transform:translate(var(--dx),var(--dy)) scale(1.15);opacity:0}12%{opacity:1}70%{opacity:.9}100%{transform:translate(0,0) scale(.05);opacity:0}}
 @keyframes bt-mem-gulp{0%{transform:scale(1)}38%{transform:scale(1.14)}66%{transform:scale(.9)}100%{transform:scale(1)}}
-@media (prefers-reduced-motion: reduce){.bt-mem-suck,.bt-mem-card[data-eating] .bt-mem-mark{display:none}}
+@media (prefers-reduced-motion: reduce){.bt-mem-particle{display:none}}
 `;
 var sessionOf = (source) => typeof source === "string" && source.startsWith("session:") ? source.slice("session:".length).split(" ")[0] : null;
 var openRow = (sessionId) => {
@@ -22999,6 +23001,7 @@ function MemoryTabBody(props) {
   const [selected, setSelected] = (0, import_react49.useState)(null);
   const [creating, setCreating] = (0, import_react49.useState)(false);
   const [eating, setEating] = (0, import_react49.useState)(null);
+  const [eatSeq, setEatSeq] = (0, import_react49.useState)(0);
   const eatTimer = (0, import_react49.useRef)(0);
   const gridRef = (0, import_react49.useRef)(null);
   const bots = roster?.bots ?? [];
@@ -23036,25 +23039,27 @@ function MemoryTabBody(props) {
   }, [bots.length]);
   const startEating = (botId) => {
     setEating(botId);
+    setEatSeq((seq) => seq + 1);
     clearTimeout(eatTimer.current);
-    eatTimer.current = setTimeout(() => setEating(null), 1e3);
+    eatTimer.current = setTimeout(() => setEating(null), 1100);
   };
   (0, import_react49.useEffect)(() => () => clearTimeout(eatTimer.current), []);
   const intake = (key) => eating !== key ? null : (0, import_react49.createElement)(
     "span",
-    { className: "bt-mem-suck", "aria-hidden": true },
+    { key: eatSeq, className: "bt-mem-suck", "aria-hidden": true },
     (0, import_react49.createElement)("span", { className: "bt-mem-wave" }),
-    ...Array.from({ length: 10 }, (_, index) => (0, import_react49.createElement)("span", {
+    ...Array.from({ length: 14 }, (_, index) => (0, import_react49.createElement)("span", {
       key: index,
       className: "bt-mem-particle",
       style: {
-        "--dx": `${Math.round(Math.cos(index / 10 * Math.PI * 2) * (38 + index % 3 * 9))}px`,
-        "--dy": `${Math.round(Math.sin(index / 10 * Math.PI * 2) * (38 + index % 3 * 9))}px`,
+        "--dx": `${Math.round(Math.cos(index / 14 * Math.PI * 2) * (44 + index % 4 * 10))}px`,
+        "--dy": `${Math.round(Math.sin(index / 14 * Math.PI * 2) * (44 + index % 4 * 10))}px`,
         "--i": index
       }
     }))
   );
   const learn = async (botId, sessionId, fallbackName = "") => {
+    startEating(botId);
     setBusy(botId);
     setError("");
     setResult(null);
