@@ -22941,23 +22941,22 @@ var MEMORY_TAB_CSS = `
 .bt-mem-new{border-style:dashed;opacity:.75;justify-content:center}
 .bt-mem-new[data-over]{opacity:1}
 .bt-mem-new-plus{font-size:22px;line-height:1;opacity:.7}
+.bt-mem-card{position:relative}
+.bt-mem-mark{display:inline-flex;line-height:0}
+/* The live mark's own hover animation: the same nuzzle DS Bot's about card uses. */
+.bt-mem-card:hover .bt-mark[data-live][data-state=idle]:not(.bt-mark-poke) .bt-b{rotate:8deg;translate:5% -1%;animation:bt-nuzzle .78s ease-in-out .32s infinite}
+.bt-mem-card:hover .bt-mark[data-live][data-state=idle] .bt-eye{scale:1 0;animation:none}
+.bt-mem-card:hover .bt-mark[data-live][data-state=idle] .bt-eye-happy{opacity:1;transition-delay:.1s}
+body[data-bt-motion=quiet] .bt-mem-card:hover .bt-mark .bt-b{animation:none;rotate:0deg;translate:0 0}
+.bt-mem-card[data-eating] .bt-mem-mark{animation:bt-mem-gulp .64s cubic-bezier(.3,0,.2,1)}
+.bt-mem-suck{position:absolute;inset:0;pointer-events:none;z-index:2}
+.bt-mem-wave{position:absolute;left:50%;top:30px;width:76px;height:76px;margin:-38px 0 0 -38px;border-radius:50%;border:2px solid var(--dsw-alias-state-business-primary,#4D6BFE);opacity:0;animation:bt-mem-suck-wave .68s cubic-bezier(.4,0,.2,1) forwards}
+.bt-mem-particle{position:absolute;left:50%;top:30px;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:var(--dsw-alias-state-business-primary,#4D6BFE);opacity:0;animation:bt-mem-suck-bit .68s ease-in forwards;animation-delay:calc(var(--i,0) * 26ms)}
+@keyframes bt-mem-suck-wave{0%{transform:scale(2.5);opacity:0}22%{opacity:.85}100%{transform:scale(.22);opacity:0}}
+@keyframes bt-mem-suck-bit{0%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:.95}72%{opacity:.75}100%{transform:translate(0,0) scale(.1);opacity:0}}
+@keyframes bt-mem-gulp{0%{transform:scale(1)}38%{transform:scale(1.14)}66%{transform:scale(.9)}100%{transform:scale(1)}}
+@media (prefers-reduced-motion: reduce){.bt-mem-suck,.bt-mem-card[data-eating] .bt-mem-mark{display:none}}
 `;
-var avatarSerial = 0;
-function BotAvatar2({ look, size = 40 }) {
-  const box = shapeOf(look.shape).size;
-  const mask = `bt-mem-${++avatarSerial}`;
-  const dark = document.documentElement.hasAttribute("data-ds-dark-theme");
-  const ink = INKS[look.color]?.[dark ? 1 : 0] ?? "#4D6BFE";
-  return (0, import_react49.createElement)("svg", {
-    width: size,
-    height: size,
-    viewBox: `0 0 ${box} ${box}`,
-    "aria-hidden": true,
-    focusable: "false",
-    dangerouslySetInnerHTML: { __html: characterMarkup(look.shape, ink).replaceAll(MASK_ID, mask) }
-  });
-}
-var lookOfBot = (bot) => ({ shape: bot?.avatar?.shape ?? "whale", color: bot?.color ?? "deepseek" });
 var sessionOf = (source) => typeof source === "string" && source.startsWith("session:") ? source.slice("session:".length).split(" ")[0] : null;
 var openRow = (sessionId) => {
   if (typeof document === "undefined") return false;
@@ -22986,6 +22985,8 @@ function MemoryTabBody(props) {
   const [shown, setShown] = (0, import_react49.useState)({});
   const [selected, setSelected] = (0, import_react49.useState)(null);
   const [creating, setCreating] = (0, import_react49.useState)(false);
+  const [eating, setEating] = (0, import_react49.useState)(null);
+  const eatTimer = (0, import_react49.useRef)(0);
   const gridRef = (0, import_react49.useRef)(null);
   const bots = roster?.bots ?? [];
   const refreshSources = async () => {
@@ -23020,6 +23021,26 @@ function MemoryTabBody(props) {
     grid2.addEventListener("wheel", wheel, { passive: false });
     return () => grid2.removeEventListener("wheel", wheel);
   }, [bots.length]);
+  const startEating = (botId) => {
+    setEating(botId);
+    clearTimeout(eatTimer.current);
+    eatTimer.current = setTimeout(() => setEating(null), 1e3);
+  };
+  (0, import_react49.useEffect)(() => () => clearTimeout(eatTimer.current), []);
+  const intake = (key) => eating !== key ? null : (0, import_react49.createElement)(
+    "span",
+    { className: "bt-mem-suck", "aria-hidden": true },
+    (0, import_react49.createElement)("span", { className: "bt-mem-wave" }),
+    ...Array.from({ length: 10 }, (_, index) => (0, import_react49.createElement)("span", {
+      key: index,
+      className: "bt-mem-particle",
+      style: {
+        "--dx": `${Math.round(Math.cos(index / 10 * Math.PI * 2) * (38 + index % 3 * 9))}px`,
+        "--dy": `${Math.round(Math.sin(index / 10 * Math.PI * 2) * (38 + index % 3 * 9))}px`,
+        "--i": index
+      }
+    }))
+  );
   const learn = async (botId, sessionId, fallbackName = "") => {
     setBusy(botId);
     setError("");
@@ -23047,6 +23068,7 @@ function MemoryTabBody(props) {
     setOver(null);
     const sessionId = event.dataTransfer?.getData("text/plain") ?? "";
     if (sessionId === "") return;
+    startEating(botId);
     void learn(botId, sessionId);
   };
   const adopt = async () => {
@@ -23107,6 +23129,7 @@ function MemoryTabBody(props) {
       "data-on": selected === bot.id ? "" : void 0,
       "data-over": over === bot.id ? "" : void 0,
       "data-busy": busy === bot.id ? "" : void 0,
+      "data-eating": eating === bot.id ? "" : void 0,
       onClick: () => setSelected(bot.id),
       onDragOver: (event) => {
         event.preventDefault();
@@ -23118,9 +23141,10 @@ function MemoryTabBody(props) {
       },
       onDrop: (event) => onDrop(event, bot.id)
     },
-    (0, import_react49.createElement)(BotAvatar2, { look: lookOfBot(bot), size: 40 }),
+    (0, import_react49.createElement)("span", { className: "bt-mem-mark" }, (0, import_react49.createElement)(BotMark, { bot, size: 40, live: true })),
     (0, import_react49.createElement)("div", { className: "bt-mem-name" }, bot.name),
-    bot.role ? (0, import_react49.createElement)("div", { className: "bt-mem-role" }, bot.role) : null
+    bot.role ? (0, import_react49.createElement)("div", { className: "bt-mem-role" }, bot.role) : null,
+    intake(bot.id)
   ));
   const newCard = (0, import_react49.createElement)(
     "div",
@@ -23129,6 +23153,7 @@ function MemoryTabBody(props) {
       className: "bt-mem-card bt-mem-new",
       "data-over": over === "__new__" ? "" : void 0,
       "data-busy": creating ? "" : void 0,
+      "data-eating": eating === "__new__" ? "" : void 0,
       onDragOver: (event) => {
         event.preventDefault();
         if (event.dataTransfer !== null) event.dataTransfer.dropEffect = "copy";
@@ -23142,11 +23167,13 @@ function MemoryTabBody(props) {
         setOver(null);
         const sessionId = event.dataTransfer?.getData("text/plain") ?? "";
         if (sessionId === "") return;
+        startEating("__new__");
         void createAndLearn(sessionId);
       }
     },
     (0, import_react49.createElement)("div", { className: "bt-mem-new-plus" }, "＋"),
-    (0, import_react49.createElement)("div", { className: "bt-mem-name" }, say("新建 Bot", "New Bot"))
+    (0, import_react49.createElement)("div", { className: "bt-mem-name" }, say("新建 Bot", "New Bot")),
+    intake("__new__")
   );
   const grid = useRoster === null ? null : (0, import_react49.createElement)("div", { ref: gridRef, className: "bt-mem-grid" }, [...botCards, newCard]);
   const suggestion = result !== null && result.suggestion !== null ? (0, import_react49.createElement)(

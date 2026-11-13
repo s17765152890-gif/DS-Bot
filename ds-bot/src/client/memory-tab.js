@@ -14,8 +14,7 @@
 import { createElement as h, useEffect, useRef, useState } from 'react'
 import { call } from './api.js'
 import { language } from './i18n.js'
-import { characterMarkup, MASK_ID, shapeOf } from './characters.js'
-import { INKS } from './inks.js'
+import { BotMark } from './mark.js'
 import { DsBotNavIcon } from './sidebar.js'
 
 export const MEMORY_TAB_ID = 'ds-bot-memory'
@@ -70,28 +69,23 @@ export const MEMORY_TAB_CSS = `
 .bt-mem-new{border-style:dashed;opacity:.75;justify-content:center}
 .bt-mem-new[data-over]{opacity:1}
 .bt-mem-new-plus{font-size:22px;line-height:1;opacity:.7}
+.bt-mem-card{position:relative}
+.bt-mem-mark{display:inline-flex;line-height:0}
+/* The live mark's own hover animation: the same nuzzle DS Bot's about card uses. */
+.bt-mem-card:hover .bt-mark[data-live][data-state=idle]:not(.bt-mark-poke) .bt-b{rotate:8deg;translate:5% -1%;animation:bt-nuzzle .78s ease-in-out .32s infinite}
+.bt-mem-card:hover .bt-mark[data-live][data-state=idle] .bt-eye{scale:1 0;animation:none}
+.bt-mem-card:hover .bt-mark[data-live][data-state=idle] .bt-eye-happy{opacity:1;transition-delay:.1s}
+body[data-bt-motion=quiet] .bt-mem-card:hover .bt-mark .bt-b{animation:none;rotate:0deg;translate:0 0}
+.bt-mem-card[data-eating] .bt-mem-mark{animation:bt-mem-gulp .64s cubic-bezier(.3,0,.2,1)}
+.bt-mem-suck{position:absolute;inset:0;pointer-events:none;z-index:2}
+.bt-mem-wave{position:absolute;left:50%;top:30px;width:76px;height:76px;margin:-38px 0 0 -38px;border-radius:50%;border:2px solid var(--dsw-alias-state-business-primary,#4D6BFE);opacity:0;animation:bt-mem-suck-wave .68s cubic-bezier(.4,0,.2,1) forwards}
+.bt-mem-particle{position:absolute;left:50%;top:30px;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:var(--dsw-alias-state-business-primary,#4D6BFE);opacity:0;animation:bt-mem-suck-bit .68s ease-in forwards;animation-delay:calc(var(--i,0) * 26ms)}
+@keyframes bt-mem-suck-wave{0%{transform:scale(2.5);opacity:0}22%{opacity:.85}100%{transform:scale(.22);opacity:0}}
+@keyframes bt-mem-suck-bit{0%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:.95}72%{opacity:.75}100%{transform:translate(0,0) scale(.1);opacity:0}}
+@keyframes bt-mem-gulp{0%{transform:scale(1)}38%{transform:scale(1.14)}66%{transform:scale(.9)}100%{transform:scale(1)}}
+@media (prefers-reduced-motion: reduce){.bt-mem-suck,.bt-mem-card[data-eating] .bt-mem-mark{display:none}}
 `
 
-let avatarSerial = 0
-
-// A Bot's own character, painted with a concrete ink: the panel lives outside the Bot
-// surface, where DS Bot's ink variables are not defined.
-function BotAvatar({ look, size = 40 }) {
-  const box = shapeOf(look.shape).size
-  const mask = `bt-mem-${++avatarSerial}`
-  const dark = document.documentElement.hasAttribute('data-ds-dark-theme')
-  const ink = INKS[look.color]?.[dark ? 1 : 0] ?? '#4D6BFE'
-  return h('svg', {
-    width: size,
-    height: size,
-    viewBox: `0 0 ${box} ${box}`,
-    'aria-hidden': true,
-    focusable: 'false',
-    dangerouslySetInnerHTML: { __html: characterMarkup(look.shape, ink).replaceAll(MASK_ID, mask) },
-  })
-}
-
-const lookOfBot = (bot) => ({ shape: bot?.avatar?.shape ?? 'whale', color: bot?.color ?? 'deepseek' })
 // A learned entry carries its origin as `session:<id>`; anything else (a Bot's own chat,
 // the memory panel) is not a Session the panel can open.
 const sessionOf = (source) => (typeof source === 'string' && source.startsWith('session:') ? source.slice('session:'.length).split(' ')[0] : null)
@@ -129,6 +123,8 @@ export function MemoryTabBody(props) {
   const [shown, setShown] = useState({})
   const [selected, setSelected] = useState(null)
   const [creating, setCreating] = useState(false)
+  const [eating, setEating] = useState(null)
+  const eatTimer = useRef(0)
   const gridRef = useRef(null)
   const bots = roster?.bots ?? []
 
@@ -161,6 +157,26 @@ export function MemoryTabBody(props) {
     return () => grid.removeEventListener('wheel', wheel)
   }, [bots.length])
 
+  // The intake: the mark gulps and a ring of light contracts into it, so a drop reads as
+  // "it took that in" rather than as a silent upload. Particles ride the same ring inward.
+  const startEating = (botId) => {
+    setEating(botId)
+    clearTimeout(eatTimer.current)
+    eatTimer.current = setTimeout(() => setEating(null), 1000)
+  }
+  useEffect(() => () => clearTimeout(eatTimer.current), [])
+  const intake = (key) => (eating !== key ? null : h('span', { className: 'bt-mem-suck', 'aria-hidden': true },
+    h('span', { className: 'bt-mem-wave' }),
+    ...Array.from({ length: 10 }, (_, index) => h('span', {
+      key: index,
+      className: 'bt-mem-particle',
+      style: {
+        '--dx': `${Math.round(Math.cos((index / 10) * Math.PI * 2) * (38 + (index % 3) * 9))}px`,
+        '--dy': `${Math.round(Math.sin((index / 10) * Math.PI * 2) * (38 + (index % 3) * 9))}px`,
+        '--i': index,
+      },
+    }))))
+
   const learn = async (botId, sessionId, fallbackName = '') => {
     setBusy(botId)
     setError('')
@@ -189,6 +205,7 @@ export function MemoryTabBody(props) {
     setOver(null)
     const sessionId = event.dataTransfer?.getData('text/plain') ?? ''
     if (sessionId === '') return
+    startEating(botId)
     void learn(botId, sessionId)
   }
 
@@ -250,6 +267,7 @@ export function MemoryTabBody(props) {
     'data-on': selected === bot.id ? '' : undefined,
     'data-over': over === bot.id ? '' : undefined,
     'data-busy': busy === bot.id ? '' : undefined,
+    'data-eating': eating === bot.id ? '' : undefined,
     onClick: () => setSelected(bot.id),
     onDragOver: (event) => {
       event.preventDefault()
@@ -259,9 +277,10 @@ export function MemoryTabBody(props) {
     onDragLeave: () => { if (over === bot.id) setOver(null) },
     onDrop: (event) => onDrop(event, bot.id),
   },
-  h(BotAvatar, { look: lookOfBot(bot), size: 40 }),
+  h('span', { className: 'bt-mem-mark' }, h(BotMark, { bot, size: 40, live: true })),
   h('div', { className: 'bt-mem-name' }, bot.name),
-  bot.role ? h('div', { className: 'bt-mem-role' }, bot.role) : null))
+  bot.role ? h('div', { className: 'bt-mem-role' }, bot.role) : null,
+  intake(bot.id)))
 
   // The empty seat at the end of the row: dropping here makes a Bot, then teaches it.
   const newCard = h('div', {
@@ -269,6 +288,7 @@ export function MemoryTabBody(props) {
     className: 'bt-mem-card bt-mem-new',
     'data-over': over === '__new__' ? '' : undefined,
     'data-busy': creating ? '' : undefined,
+    'data-eating': eating === '__new__' ? '' : undefined,
     onDragOver: (event) => {
       event.preventDefault()
       if (event.dataTransfer !== null) event.dataTransfer.dropEffect = 'copy'
@@ -280,11 +300,13 @@ export function MemoryTabBody(props) {
       setOver(null)
       const sessionId = event.dataTransfer?.getData('text/plain') ?? ''
       if (sessionId === '') return
+      startEating('__new__')
       void createAndLearn(sessionId)
     },
   },
   h('div', { className: 'bt-mem-new-plus' }, '＋'),
-  h('div', { className: 'bt-mem-name' }, say('新建 Bot', 'New Bot')))
+  h('div', { className: 'bt-mem-name' }, say('新建 Bot', 'New Bot')),
+  intake('__new__'))
 
   const grid = useRoster === null
     ? null
