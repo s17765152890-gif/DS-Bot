@@ -22961,6 +22961,10 @@ var MEMORY_TAB_CSS = `
 .bt-mem-new{border-style:dashed;opacity:.75;justify-content:center}
 .bt-mem-new[data-over]{opacity:1}
 .bt-mem-new-plus{font-size:22px;line-height:1;opacity:.7}
+.bt-mem-model{display:flex;flex-direction:column;gap:4px}
+.bt-mem-model-label{font-size:11px;opacity:.6}
+.bt-mem-select{width:100%;box-sizing:border-box;min-height:28px;padding:0 8px;border-radius:8px;border:.5px solid var(--dsw-alias-border-l3,rgba(127,127,127,.24));background:var(--dsw-alias-bg-layer-1,rgba(127,127,127,.06));color:inherit;font:inherit;font-size:12px;cursor:pointer}
+.bt-mem-select:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary,#4D6BFE);outline-offset:1px}
 .bt-mem-card{position:relative}
 .bt-mem-mark{display:inline-flex;line-height:0}
 /* The live mark's own hover animation: the same nuzzle DS Bot's about card uses. */
@@ -23008,6 +23012,7 @@ function MemoryTabBody(props) {
   const [result, setResult] = (0, import_react49.useState)(null);
   const [error, setError] = (0, import_react49.useState)("");
   const [sources, setSources] = (0, import_react49.useState)({});
+  const [catalog, setCatalog] = (0, import_react49.useState)({ models: [], current: "" });
   const [memories, setMemories] = (0, import_react49.useState)({});
   const [shown, setShown] = (0, import_react49.useState)({});
   const [selected, setSelected] = (0, import_react49.useState)(null);
@@ -23032,8 +23037,30 @@ function MemoryTabBody(props) {
       setMemories((state) => ({ ...state, [botId]: [] }));
     }
   };
+  const refreshCatalog = async () => {
+    try {
+      const view = await call("state", {});
+      setCatalog({
+        models: Array.isArray(view?.models) ? view.models : [],
+        current: typeof view?.prefs?.defaultBotModel === "string" ? view.prefs.defaultBotModel : ""
+      });
+    } catch {
+    }
+  };
+  const pickModel = async (ref) => {
+    setCatalog((state) => ({ ...state, current: ref }));
+    try {
+      await call("set-prefs", { defaultBotModel: ref === "" ? null : ref });
+    } catch (failure) {
+      setError(friendly(failure));
+      void refreshCatalog();
+    }
+  };
   (0, import_react49.useEffect)(() => {
     void refreshSources();
+  }, []);
+  (0, import_react49.useEffect)(() => {
+    void refreshCatalog();
   }, []);
   (0, import_react49.useEffect)(() => {
     void refreshMemories(selected);
@@ -23221,6 +23248,27 @@ function MemoryTabBody(props) {
     aura("__new__"),
     intake("__new__")
   );
+  const modelPicker = catalog.models.length === 0 ? null : (0, import_react49.createElement)(
+    "label",
+    { className: "bt-mem-model" },
+    (0, import_react49.createElement)("span", { className: "bt-mem-model-label" }, say("新建 Bot 的默认模型", "Default model for a new Bot")),
+    (0, import_react49.createElement)(
+      "select",
+      {
+        className: "bt-mem-select",
+        value: catalog.current,
+        onChange: (event) => {
+          void pickModel(event.target.value);
+        }
+      },
+      (0, import_react49.createElement)("option", { value: "" }, say("跟随 DSH 默认", "Follow the DSH default")),
+      ...catalog.models.map((entry) => (0, import_react49.createElement)("option", {
+        key: entry.ref,
+        value: entry.ref,
+        disabled: entry.needsKey === true
+      }, `${entry.providerName ?? entry.provider} · ${entry.name}${entry.needsKey === true ? say("（缺密钥）", " (no key)") : ""}`))
+    )
+  );
   const grid = useRoster === null ? null : (0, import_react49.createElement)("div", { ref: gridRef, className: "bt-mem-grid" }, [...botCards, newCard]);
   const suggestion = result !== null && result.suggestion !== null ? (0, import_react49.createElement)(
     "div",
@@ -23311,6 +23359,7 @@ function MemoryTabBody(props) {
       (0, import_react49.createElement)("div", { className: "bt-mem-title" }, say("DS Bot 记忆", "DS Bot memory")),
       (0, import_react49.createElement)("div", { className: "bt-mem-hint" }, say("把左侧的会话拖到某个 Bot 上，它会读完并记住；会话本身留在原处。", "Drag a session from the left onto a Bot: it reads it into memory and the session stays where it was."))
     ),
+    modelPicker,
     useRoster === null ? (0, import_react49.createElement)("div", { className: "bt-mem-error" }, say("面板没拿到团队数据（hooks 未注入）。把这句话告诉我，我去改注册方式。", "The panel got no team data (hooks not injected). Tell me this line and I will fix the registration.")) : null,
     grid,
     busy !== null ? (0, import_react49.createElement)("div", { className: "bt-mem-note" }, say("正在读这个会话…", "Reading the session…")) : null,

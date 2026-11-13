@@ -77,6 +77,10 @@ export const MEMORY_TAB_CSS = `
 .bt-mem-new{border-style:dashed;opacity:.75;justify-content:center}
 .bt-mem-new[data-over]{opacity:1}
 .bt-mem-new-plus{font-size:22px;line-height:1;opacity:.7}
+.bt-mem-model{display:flex;flex-direction:column;gap:4px}
+.bt-mem-model-label{font-size:11px;opacity:.6}
+.bt-mem-select{width:100%;box-sizing:border-box;min-height:28px;padding:0 8px;border-radius:8px;border:.5px solid var(--dsw-alias-border-l3,rgba(127,127,127,.24));background:var(--dsw-alias-bg-layer-1,rgba(127,127,127,.06));color:inherit;font:inherit;font-size:12px;cursor:pointer}
+.bt-mem-select:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary,#4D6BFE);outline-offset:1px}
 .bt-mem-card{position:relative}
 .bt-mem-mark{display:inline-flex;line-height:0}
 /* The live mark's own hover animation: the same nuzzle DS Bot's about card uses. */
@@ -134,6 +138,9 @@ export function MemoryTabBody(props) {
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
   const [sources, setSources] = useState({})
+  // What a new Bot starts on, and the models this profile can serve: the same list the
+  // Bot settings page offers, read from the state view.
+  const [catalog, setCatalog] = useState({ models: [], current: '' })
   const [memories, setMemories] = useState({})
   const [shown, setShown] = useState({})
   const [selected, setSelected] = useState(null)
@@ -156,7 +163,26 @@ export function MemoryTabBody(props) {
       setMemories(state => ({ ...state, [botId]: [] }))
     }
   }
+  const refreshCatalog = async () => {
+    try {
+      const view = await call('state', {})
+      setCatalog({
+        models: Array.isArray(view?.models) ? view.models : [],
+        current: typeof view?.prefs?.defaultBotModel === 'string' ? view.prefs.defaultBotModel : '',
+      })
+    } catch { /* the picker simply stays as it was */ }
+  }
+  const pickModel = async (ref) => {
+    setCatalog(state => ({ ...state, current: ref }))
+    try {
+      await call('set-prefs', { defaultBotModel: ref === '' ? null : ref })
+    } catch (failure) {
+      setError(friendly(failure))
+      void refreshCatalog()
+    }
+  }
   useEffect(() => { void refreshSources() }, [])
+  useEffect(() => { void refreshCatalog() }, [])
   useEffect(() => { void refreshMemories(selected) }, [selected])
 
   // The row scrolls sideways on a plain wheel, like a filmstrip: the panel's own scroll
@@ -344,6 +370,20 @@ export function MemoryTabBody(props) {
   aura('__new__'),
   intake('__new__'))
 
+  const modelPicker = catalog.models.length === 0 ? null : h('label', { className: 'bt-mem-model' },
+    h('span', { className: 'bt-mem-model-label' }, say('新建 Bot 的默认模型', 'Default model for a new Bot')),
+    h('select', {
+      className: 'bt-mem-select',
+      value: catalog.current,
+      onChange: (event) => { void pickModel(event.target.value) },
+    },
+    h('option', { value: '' }, say('跟随 DSH 默认', 'Follow the DSH default')),
+    ...catalog.models.map(entry => h('option', {
+      key: entry.ref,
+      value: entry.ref,
+      disabled: entry.needsKey === true,
+    }, `${entry.providerName ?? entry.provider} · ${entry.name}${entry.needsKey === true ? say('（缺密钥）', ' (no key)') : ''}`))))
+
   const grid = useRoster === null
     ? null
     : h('div', { ref: gridRef, className: 'bt-mem-grid' }, [...botCards, newCard])
@@ -424,6 +464,7 @@ export function MemoryTabBody(props) {
     h('div', { className: 'bt-mem-head' },
       h('div', { className: 'bt-mem-title' }, say('DS Bot 记忆', 'DS Bot memory')),
       h('div', { className: 'bt-mem-hint' }, say('把左侧的会话拖到某个 Bot 上，它会读完并记住；会话本身留在原处。', 'Drag a session from the left onto a Bot: it reads it into memory and the session stays where it was.'))),
+    modelPicker,
     useRoster === null
       ? h('div', { className: 'bt-mem-error' }, say('面板没拿到团队数据（hooks 未注入）。把这句话告诉我，我去改注册方式。', 'The panel got no team data (hooks not injected). Tell me this line and I will fix the registration.'))
       : null,
