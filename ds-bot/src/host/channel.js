@@ -202,6 +202,26 @@ export function install(rt) {
     return rt.save()
   }
 
+  // A Session's title, for the panel's "learned from" rows. The sessions service comes
+  // in two shapes across DSH versions — a snapshot store (`list.getSnapshot().byId`) and
+  // a callable list (`list()`) — so both are tried. A title is cosmetic: any failure
+  // yields '', never an error for the caller.
+  const sessionTitleOf = async (sessionId) => {
+    const sessions = ctx?.sessions
+    const list = sessions?.list
+    try {
+      if (typeof list === 'function') {
+        let rows = list.call(sessions)
+        if (rows !== null && typeof rows?.then === 'function') rows = await rows
+        if (Array.isArray(rows)) {
+          const row = rows.find(item => (item?.id ?? item?.header?.id) === sessionId)
+          if (row !== undefined) return String(row.title ?? row.header?.title ?? '')
+        }
+      }
+      const byId = typeof list?.getSnapshot === 'function' ? (list.getSnapshot()?.byId ?? {}) : {}
+      return String(byId[sessionId]?.title ?? '')
+    } catch { return '' }
+  }
   const LEARN_PROMPT_MAX = 6_000
   // Learning from a Session the team does not own: the memory panel drops a Session on
   // a Bot. The Bot's own memory review reads it, and its model suggests who the Bot
