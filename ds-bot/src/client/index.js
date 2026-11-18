@@ -360,6 +360,7 @@ export function apply(ctx) {
     render()
     const offRoster = roster.subscribe(render)
     const offRegistry = registry.subscribe(render)
+
     return () => { offRoster(); offRegistry(); style.remove() }
   }
 
@@ -379,16 +380,21 @@ export function apply(ctx) {
       const layout = layoutOf(prefs)
       const width = widthOf(prefs)
       const flatWidth = flatWidthOf(prefs)
+      // A wallpaper plugin owns the page background: while it does, the shell stops
+      // painting its own and lets the wallpaper through. A skin centre (`data-dsh-skin`)
+      // means the wallpaper plugin steps aside instead.
+      const glass = document.body.hasAttribute('data-we-glass-page') && !document.documentElement.hasAttribute('data-dsh-skin')
+
       document.body.dataset.btMotion = motion
       document.body.dataset.btLayout = layout
       document.body.style.setProperty('--bt-msg-w', String(width / 100))
       document.body.style.setProperty('--bt-flat-w', String(flatWidth / 100))
-      const next = `${id}|${accent ?? ''}|${motion}|${layout}|${width}|${flatWidth}|${registry.getSnapshot()}`
+      const next = `${id}|${accent ?? ''}|${motion}|${layout}|${width}|${flatWidth}|${registry.getSnapshot()}|${glass ? 'glass' : 'solid'}`
       if (next === key) return
       key = next
-      style.textContent = themeCss(themes[id], accent)
+      style.textContent = themeCss(themes[id], accent, glass)
       const release = releaseTokens
-      releaseTokens = ctx.theme.overrideTokens('ds-bot', shellTokens(themes[id]))
+      releaseTokens = ctx.theme.overrideTokens('ds-bot', shellTokens(themes[id], glass))
       if (typeof release === 'function') release()
       if (snapshot.ready) {
         try { localStorage.setItem(PREFS_KEY, JSON.stringify({ theme: prefs.theme, accent: prefs.accent, motion: prefs.motion, layout: prefs.layout, width: prefs.width, flatWidth: prefs.flatWidth, thinking: prefs.thinking, defaultBotModel: prefs.defaultBotModel, enterToSend: prefs.enterToSend })) } catch { /* storage unavailable */ }
@@ -397,9 +403,15 @@ export function apply(ctx) {
     render()
     const offRoster = roster.subscribe(render)
     const offRegistry = registry.subscribe(render)
+    // The wallpaper plugin marks the page when it takes it over and unmarks it when it
+    // leaves: re-render on both, so the shell goes glassy and comes back without a reload.
+    const observer = new MutationObserver(render)
+    observer.observe(document.body, { attributes: true, attributeFilter: ['data-we-glass-page', 'data-ds-dark-theme'] })
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-dsh-skin', 'data-ds-dark-theme'] })
     return () => {
       offRoster()
       offRegistry()
+      observer.disconnect()
       try {
         if (typeof releaseTokens === 'function') releaseTokens()
       } finally {

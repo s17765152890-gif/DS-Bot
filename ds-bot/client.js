@@ -2358,7 +2358,15 @@ var THEMES = {
 var DARK_INK = "#141414";
 var accentInk = (accent) => (luminance(accent) + 0.05) ** 2 > 1.05 * (luminance(DARK_INK) + 0.05) ? DARK_INK : "#ffffff";
 var rgba = (hex, alpha) => `rgba(${[1, 3, 5].map((index) => parseInt(hex.slice(index, index + 2), 16)).join(",")},${alpha})`;
-function themeVars(mode, dark, accent = mode.accent) {
+function glassVars(mode, dark) {
+  return {
+    "--bt-main": "transparent",
+    "--bt-sidebar": "transparent",
+    "--bt-card": rgba(mode.card, dark ? 0.5 : 0.55),
+    "--bt-bubble": rgba(mode.bubble, dark ? 0.72 : 0.78)
+  };
+}
+function themeVars(mode, dark, accent = mode.accent, glass = false) {
   return {
     "--bt-ink": mode.text,
     "--bt-ink-2": rgba(mode.text, 0.6),
@@ -29728,16 +29736,17 @@ function apply(ctx) {
       const layout = layoutOf(prefs);
       const width = widthOf(prefs);
       const flatWidth = flatWidthOf(prefs);
+      const glass = document.body.hasAttribute("data-we-glass-page") && !document.documentElement.hasAttribute("data-dsh-skin");
       document.body.dataset.btMotion = motion;
       document.body.dataset.btLayout = layout;
       document.body.style.setProperty("--bt-msg-w", String(width / 100));
       document.body.style.setProperty("--bt-flat-w", String(flatWidth / 100));
-      const next = `${id}|${accent ?? ""}|${motion}|${layout}|${width}|${flatWidth}|${registry.getSnapshot()}`;
+      const next = `${id}|${accent ?? ""}|${motion}|${layout}|${width}|${flatWidth}|${registry.getSnapshot()}|${glass ? "glass" : "solid"}`;
       if (next === key) return;
       key = next;
-      style.textContent = themeCss(themes[id], accent);
+      style.textContent = themeCss(themes[id], accent, glass);
       const release = releaseTokens;
-      releaseTokens = ctx.theme.overrideTokens("ds-bot", shellTokens(themes[id]));
+      releaseTokens = ctx.theme.overrideTokens("ds-bot", shellTokens(themes[id], glass));
       if (typeof release === "function") release();
       if (snapshot.ready) {
         try {
@@ -29749,9 +29758,13 @@ function apply(ctx) {
     render();
     const offRoster = roster.subscribe(render);
     const offRegistry = registry.subscribe(render);
+    const observer = new MutationObserver(render);
+    observer.observe(document.body, { attributes: true, attributeFilter: ["data-we-glass-page", "data-ds-dark-theme"] });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-dsh-skin", "data-ds-dark-theme"] });
     return () => {
       offRoster();
       offRegistry();
+      observer.disconnect();
       try {
         if (typeof releaseTokens === "function") releaseTokens();
       } finally {

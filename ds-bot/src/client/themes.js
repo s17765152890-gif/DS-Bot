@@ -34,7 +34,18 @@ const THEMES = {
 const DARK_INK = '#141414'
 const accentInk = accent => ((luminance(accent) + 0.05) ** 2 > 1.05 * (luminance(DARK_INK) + 0.05) ? DARK_INK : '#ffffff')
 const rgba = (hex, alpha) => `rgba(${[1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16)).join(',')},${alpha})`
-function themeVars(mode, dark, accent = mode.accent) {
+// When a wallpaper is behind the interface, the page and the sidebar stop painting their
+// own fill so the wallpaper shows through: only the surfaces that carry text keep a
+// colour, and even those go translucent.
+function glassVars(mode, dark) {
+  return {
+    '--bt-main': 'transparent',
+    '--bt-sidebar': 'transparent',
+    '--bt-card': rgba(mode.card, dark ? 0.5 : 0.55),
+    '--bt-bubble': rgba(mode.bubble, dark ? 0.72 : 0.78),
+  }
+}
+function themeVars(mode, dark, accent = mode.accent, glass = false) {
   return {
     '--bt-ink': mode.text, '--bt-ink-2': rgba(mode.text, 0.6), '--bt-ink-3': rgba(mode.text, 0.36),
     '--bt-bubble': mode.bubble, '--bt-sidebar': mode.sidebar, '--bt-main': mode.bg, '--bt-card': mode.card,
