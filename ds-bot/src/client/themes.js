@@ -43,6 +43,9 @@ function glassVars(mode, dark) {
     '--bt-sidebar': 'transparent',
     '--bt-card': rgba(mode.card, dark ? 0.5 : 0.55),
     '--bt-bubble': rgba(mode.bubble, dark ? 0.72 : 0.78),
+    // The tint a frosted column sits on. The blur itself is the wallpaper plugin's, so the
+    // two sidebars look the same at the same settings.
+    '--bt-glass-tint': rgba(mode.sidebar, dark ? 0.45 : 0.5),
   }
 }
 function themeVars(mode, dark, accent = mode.accent, glass = false) {

@@ -2363,7 +2363,10 @@ function glassVars(mode, dark) {
     "--bt-main": "transparent",
     "--bt-sidebar": "transparent",
     "--bt-card": rgba(mode.card, dark ? 0.5 : 0.55),
-    "--bt-bubble": rgba(mode.bubble, dark ? 0.72 : 0.78)
+    "--bt-bubble": rgba(mode.bubble, dark ? 0.72 : 0.78),
+    // The tint a frosted column sits on. The blur itself is the wallpaper plugin's, so the
+    // two sidebars look the same at the same settings.
+    "--bt-glass-tint": rgba(mode.sidebar, dark ? 0.45 : 0.5)
   };
 }
 function themeVars(mode, dark, accent = mode.accent, glass = false) {
@@ -4112,9 +4115,14 @@ body[data-ds-dark-theme] .bt-theme-chip i{background:var(--da)}
 @media (max-width:640px) and (pointer:coarse){
   .bt-input,.bt-bs-input,.bt-browser-address input,.bt-folder-input,.bt-secret-input,.bt-q-input,.bt-to input,.bt-palette-head input,.bt-mem-input{font-size:16px}
 }
+
+/* With a wallpaper behind the page, the Bot column keeps that wallpaper's own frost: the
+   same blur and saturation the wallpaper plugin uses for the shell's left sidebar, so
+   both columns read the same at the same settings. Only in glass mode, and only on this
+   column — the rest of the shell stays as it was. */
+body[data-bt-glass=on] .bt-leftcol{-webkit-backdrop-filter:blur(var(--we-left-sidebar-blur,var(--we-blur,18px))) saturate(var(--we-saturate,1.8)) brightness(var(--we-glass-brightness,1.04)) contrast(1.01);backdrop-filter:blur(var(--we-left-sidebar-blur,var(--we-blur,18px))) saturate(var(--we-saturate,1.8)) brightness(var(--we-glass-brightness,1.04)) contrast(1.01);background:var(--bt-glass-tint)}
 `;
-var CONVERSATION_CSS = `
-.bt-think{font-size:13px;line-height:18px;color:var(--bt-ink-2);margin:2px 0 4px;max-width:calc(var(--bt-msg-w) * 100%)}
+var CONVERSATION_CSS = `.bt-think{font-size:13px;line-height:18px;color:var(--bt-ink-2);margin:2px 0 4px;max-width:calc(var(--bt-msg-w) * 100%)}
 body[data-bt-layout=flat] .bt-think{max-width:calc(var(--bt-flat-w) * 100%)}
 .bt-think summary{cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:6px}
 .bt-think summary::-webkit-details-marker{display:none}
@@ -29740,6 +29748,7 @@ function apply(ctx) {
       const glass = document.body.hasAttribute("data-we-glass-page") && !document.documentElement.hasAttribute("data-dsh-skin");
       document.body.dataset.btMotion = motion;
       document.body.dataset.btLayout = layout;
+      document.body.dataset.btGlass = glass ? "on" : "off";
       document.body.style.setProperty("--bt-msg-w", String(width / 100));
       document.body.style.setProperty("--bt-flat-w", String(flatWidth / 100));
       const next = `${id}|${accent ?? ""}|${motion}|${layout}|${width}|${flatWidth}|${registry.getSnapshot()}|${glass ? "glass" : "solid"}`;
@@ -29771,6 +29780,7 @@ function apply(ctx) {
       } finally {
         delete document.body.dataset.btMotion;
         delete document.body.dataset.btLayout;
+        delete document.body.dataset.btGlass;
         document.body.style.removeProperty("--bt-msg-w");
         document.body.style.removeProperty("--bt-flat-w");
         style.remove();

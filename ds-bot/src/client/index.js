@@ -387,6 +387,7 @@ export function apply(ctx) {
 
       document.body.dataset.btMotion = motion
       document.body.dataset.btLayout = layout
+      document.body.dataset.btGlass = glass ? 'on' : 'off'
       document.body.style.setProperty('--bt-msg-w', String(width / 100))
       document.body.style.setProperty('--bt-flat-w', String(flatWidth / 100))
       const next = `${id}|${accent ?? ''}|${motion}|${layout}|${width}|${flatWidth}|${registry.getSnapshot()}|${glass ? 'glass' : 'solid'}`
@@ -417,6 +418,7 @@ export function apply(ctx) {
       } finally {
         delete document.body.dataset.btMotion
         delete document.body.dataset.btLayout
+        delete document.body.dataset.btGlass
         document.body.style.removeProperty('--bt-msg-w')
         document.body.style.removeProperty('--bt-flat-w')
         style.remove()
