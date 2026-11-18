@@ -55,6 +55,7 @@ function themeVars(mode, dark, accent = mode.accent, glass = false) {
     '--bt-accent': accent, '--bt-accent-ink': accentInk(accent),
     '--bt-user': mode.user, '--bt-user-ink': mode.userText,
     '--bt-tag-bg': rgba(mode.text, dark ? 0.09 : 0.06), '--bt-tag-ink': rgba(mode.text, 0.58),
+    ...(glass ? glassVars(mode, dark) : {}),
   }
 }
 const declarations = vars => Object.entries(vars).map(([name, value]) => `${name}:${value}`).join(';')
@@ -66,13 +67,13 @@ const darkAccent = (accent) => {
   return ink === undefined ? accent : INKS[ink][1]
 }
 // `html body` outranks the base sheet's `body` rules without !important.
-export const themeCss = (theme, accent) => `html body{${declarations(themeVars(theme.light, false, accent ?? theme.light.accent))}}
-html body[data-ds-dark-theme]{${declarations(themeVars(theme.dark, true, darkAccent(accent) ?? theme.dark.accent))}}
+export const themeCss = (theme, accent, glass = false) => `html body{${declarations(themeVars(theme.light, false, accent ?? theme.light.accent, glass))}}
+html body[data-ds-dark-theme]{${declarations(themeVars(theme.dark, true, darkAccent(accent) ?? theme.dark.accent, glass))}}
 ${theme.css ?? ''}`
-export const shellTokens = ({ light, dark }) => ({
-  '--dsw-alias-bg-base': { light: light.bg, dark: dark.bg },
-  '--dsw-specific-sidebar-fill': { light: light.sidebar, dark: dark.sidebar },
-  '--dsw-specific-input-major': { light: light.bg, dark: dark.sidebar },
+export const shellTokens = ({ light, dark }, glass = false) => ({
+  '--dsw-alias-bg-base': { light: glass ? 'transparent' : light.bg, dark: glass ? 'transparent' : dark.bg },
+  '--dsw-specific-sidebar-fill': { light: glass ? 'transparent' : light.sidebar, dark: glass ? 'transparent' : dark.sidebar },
+  '--dsw-specific-input-major': { light: glass ? rgba(light.bg, 0.5) : light.bg, dark: glass ? rgba(dark.sidebar, 0.5) : dark.sidebar },
   '--dsw-alias-label-primary': { light: light.text, dark: dark.text },
   '--dsw-alias-label-secondary': { light: rgba(light.text, 0.74), dark: rgba(dark.text, 0.74) },
   '--dsw-alias-label-tertiary': { light: rgba(light.text, 0.6), dark: rgba(dark.text, 0.6) },

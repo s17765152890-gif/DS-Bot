@@ -2384,7 +2384,8 @@ function themeVars(mode, dark, accent = mode.accent, glass = false) {
     "--bt-user": mode.user,
     "--bt-user-ink": mode.userText,
     "--bt-tag-bg": rgba(mode.text, dark ? 0.09 : 0.06),
-    "--bt-tag-ink": rgba(mode.text, 0.58)
+    "--bt-tag-ink": rgba(mode.text, 0.58),
+    ...glass ? glassVars(mode, dark) : {}
   };
 }
 var declarations = (vars) => Object.entries(vars).map(([name, value]) => `${name}:${value}`).join(";");
@@ -2392,13 +2393,13 @@ var darkAccent = (accent) => {
   const ink = ACCENT_INKS.find((id) => INKS[id][0] === accent);
   return ink === void 0 ? accent : INKS[ink][1];
 };
-var themeCss = (theme, accent) => `html body{${declarations(themeVars(theme.light, false, accent ?? theme.light.accent))}}
-html body[data-ds-dark-theme]{${declarations(themeVars(theme.dark, true, darkAccent(accent) ?? theme.dark.accent))}}
+var themeCss = (theme, accent, glass = false) => `html body{${declarations(themeVars(theme.light, false, accent ?? theme.light.accent, glass))}}
+html body[data-ds-dark-theme]{${declarations(themeVars(theme.dark, true, darkAccent(accent) ?? theme.dark.accent, glass))}}
 ${theme.css ?? ""}`;
-var shellTokens = ({ light, dark }) => ({
-  "--dsw-alias-bg-base": { light: light.bg, dark: dark.bg },
-  "--dsw-specific-sidebar-fill": { light: light.sidebar, dark: dark.sidebar },
-  "--dsw-specific-input-major": { light: light.bg, dark: dark.sidebar },
+var shellTokens = ({ light, dark }, glass = false) => ({
+  "--dsw-alias-bg-base": { light: glass ? "transparent" : light.bg, dark: glass ? "transparent" : dark.bg },
+  "--dsw-specific-sidebar-fill": { light: glass ? "transparent" : light.sidebar, dark: glass ? "transparent" : dark.sidebar },
+  "--dsw-specific-input-major": { light: glass ? rgba(light.bg, 0.5) : light.bg, dark: glass ? rgba(dark.sidebar, 0.5) : dark.sidebar },
   "--dsw-alias-label-primary": { light: light.text, dark: dark.text },
   "--dsw-alias-label-secondary": { light: rgba(light.text, 0.74), dark: rgba(dark.text, 0.74) },
   "--dsw-alias-label-tertiary": { light: rgba(light.text, 0.6), dark: rgba(dark.text, 0.6) }
