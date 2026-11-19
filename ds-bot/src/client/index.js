@@ -1133,6 +1133,14 @@ export function apply(ctx) {
     ...SHELL_SHEETS.map(([text, tag]) => () => installCompiledStyles(text, tag)),
     () => installFrameWatch(frame),
     () => installFrameSync(),
+    // The Bot surface keeps its own sidebar geometry. Re-applying it on every mount means a
+    // trip through the native surface — which has a sidebar of its own, with its own width
+    // — cannot leave this column at the shell's width when the Bot surface comes back.
+    () => {
+      actions.setSidebarWidth(sidebarSaved.width)
+      sidebarPref.set(sidebarSaved.pref)
+      return () => {}
+    },
     () => installTheme(),
     // The settings seat belongs to the Bot surface: DSH's own shell (ui-settings-general)
     // owns it in Agent mode, and this one takes it over here. A seat that cannot be taken
