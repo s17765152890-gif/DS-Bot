@@ -1027,7 +1027,12 @@ body[data-ds-dark-theme] .bt-theme-chip i{background:var(--da)}
    same blur and saturation the wallpaper plugin uses for the shell's left sidebar, so
    both columns read the same at the same settings. Only in glass mode, and only on this
    column — the rest of the shell stays as it was. */
-body[data-bt-glass=on] .bt-leftcol{-webkit-backdrop-filter:blur(var(--we-left-sidebar-blur,var(--we-blur,18px))) saturate(var(--we-saturate,1.8)) brightness(var(--we-glass-brightness,1.04)) contrast(1.01);backdrop-filter:blur(var(--we-left-sidebar-blur,var(--we-blur,18px))) saturate(var(--we-saturate,1.8)) brightness(var(--we-glass-brightness,1.04)) contrast(1.01);background:var(--bt-glass-tint)}
+body[data-bt-glass=on] .bt-leftcol{background:transparent;border-right-color:transparent}
+body[data-bt-glass=on] .bt-leftcol[data-left=drawer]{background:transparent;box-shadow:none}
+/* The panel starts below the title band, like the shell's own sidebar: above it the
+   column is nothing at all, so the wallpaper runs to the window edge and the two
+   sidebars line up at the same height. */
+body[data-bt-glass=on] .bt-leftcol::before{content:'';position:absolute;left:0;right:0;top:var(--bt-lc-clear);bottom:0;z-index:-1;pointer-events:none;background:var(--bt-glass-tint);border-right:.5px solid var(--bt-line);border-top-right-radius:var(--dsw-radius-lg,12px);-webkit-backdrop-filter:blur(var(--we-left-sidebar-blur,var(--we-blur,18px))) saturate(var(--we-saturate,1.8)) brightness(var(--we-glass-brightness,1.04)) contrast(1.01);backdrop-filter:blur(var(--we-left-sidebar-blur,var(--we-blur,18px))) saturate(var(--we-saturate,1.8)) brightness(var(--we-glass-brightness,1.04)) contrast(1.01)}
 `
 
 export const CONVERSATION_CSS = `.bt-think{font-size:13px;line-height:18px;color:var(--bt-ink-2);margin:2px 0 4px;max-width:calc(var(--bt-msg-w) * 100%)}
