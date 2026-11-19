@@ -29461,6 +29461,7 @@ function apply(ctx) {
   let seenAt = seenStore.read();
   const ui2 = createSource({ details: null, view: "details", renaming: false, tab: null, side: null, newChat: null, exchange: null, menu: null, voice: null, palette: null, quote: null, settings: null, memory: null, toast: null, signIn: null, renameAgent: null, unread: unreadStore.read(), reactions: reactionStore.read(), visits: {}, panelYield: false, leftDrawer: false, bootFailed: false, goalCompose: null, goalOpen: null });
   let sidebarSaved = readSidebar();
+  let nativeSidebarWidth = null;
   const sidebarPref = createSource(sidebarSaved.pref);
   const frame = createSource({ viewport: typeof window === "undefined" ? 0 : window.innerWidth, sidebarWidth: sidebarSaved.width, collapsedWidth: 0, collapsed: false });
   const surface = createSource({ mode: readMode(), plain: false });
@@ -29975,6 +29976,11 @@ function apply(ctx) {
       ctx.layout.selectPanel(id);
     },
     toggleSidebar: () => {
+      if (typeof document !== "undefined") {
+        const column = document.querySelector('[class*="_sidebarCol"]');
+        const width = column?.getBoundingClientRect().width;
+        if (Number.isFinite(width) && width > 0) nativeSidebarWidth = width;
+      }
       ctx.layout.toggleSidebar();
     },
     // The left column's own preference: 'open', 'rail' or 'hidden'. The switch
@@ -30011,7 +30017,16 @@ function apply(ctx) {
       }
       writeMode(mode);
       surface.set((state) => ({ ...state, mode }));
-      if (mode === "agent" && window.innerWidth >= DSH_NARROW && frame.getSnapshot().collapsed) ctx.layout.toggleSidebar();
+      if (mode === "agent" && window.innerWidth >= DSH_NARROW && frame.getSnapshot().collapsed) {
+        ctx.layout.toggleSidebar();
+        const setSidebar = ctx.layout?.panels?.setSidebar;
+        if (typeof setSidebar === "function" && nativeSidebarWidth !== null) {
+          try {
+            setSidebar.call(ctx.layout.panels, nativeSidebarWidth);
+          } catch {
+          }
+        }
+      }
       const other = mode === "agent" ? "bot" : "agent";
       setTimeout(() => {
         if (surface.getSnapshot().mode !== mode) return;

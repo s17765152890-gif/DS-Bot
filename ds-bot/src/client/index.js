@@ -83,6 +83,9 @@ export function apply(ctx) {
   // in frame-layout.js read: the window and the shell's collapsed track come from
   // installFrameWatch, the open column's width is the user's own.
   let sidebarSaved = readSidebar()
+  // The shell's own sidebar width, as it was before the Bot surface collapsed it: the
+  // collapse zeroes it and the expand restores a default, so it is put back on the way out.
+  let nativeSidebarWidth = null
   const sidebarPref = createSource(sidebarSaved.pref)
   const frame = createSource({ viewport: typeof window === 'undefined' ? 0 : window.innerWidth, sidebarWidth: sidebarSaved.width, collapsedWidth: 0, collapsed: false })
   // Bot mode paints the whole team surface; Agent mode withdraws every slot and
@@ -607,7 +610,16 @@ export function apply(ctx) {
       show(target)
     },
     selectPanel: (id) => { ctx.layout.selectPanel(id) },
-    toggleSidebar: () => { ctx.layout.toggleSidebar() },
+    toggleSidebar: () => {
+      // Collapsing zeroes the shell's own width, and expanding brings back its default
+      // rather than what the user had. Remember the width while it is still there.
+      if (typeof document !== 'undefined') {
+        const column = document.querySelector('[class*="_sidebarCol"]')
+        const width = column?.getBoundingClientRect().width
+        if (Number.isFinite(width) && width > 0) nativeSidebarWidth = width
+      }
+      ctx.layout.toggleSidebar()
+    },
     // The left column's own preference: 'open', 'rail' or 'hidden'. The switch
     // remembers the shown one it hid; a drag sets the open column's width.
     setSidebarPref: (pref) => {
@@ -647,7 +659,15 @@ export function apply(ctx) {
       surface.set(state => ({ ...state, mode }))
       // The Bot view kept the shell's sidebar collapsed under its own column; the
       // shell's own view gets it back (below DSH_NARROW the shell decides itself).
-      if (mode === 'agent' && window.innerWidth >= DSH_NARROW && frame.getSnapshot().collapsed) ctx.layout.toggleSidebar()
+      if (mode === 'agent' && window.innerWidth >= DSH_NARROW && frame.getSnapshot().collapsed) {
+        ctx.layout.toggleSidebar()
+        // The shell expands to its default width; put back the one the Bot surface took
+        // away, so switching surfaces never costs the user their sidebar size.
+        const setSidebar = ctx.layout?.panels?.setSidebar
+        if (typeof setSidebar === 'function' && nativeSidebarWidth !== null) {
+          try { setSidebar.call(ctx.layout.panels, nativeSidebarWidth) } catch { /* the shell keeps its own */ }
+        }
+      }
       // Land on the conversation this surface was on. Deferred by a tick: opening it
       // before the surface change renders lets the plain-session sync undo the jump.
       const other = mode === 'agent' ? 'bot' : 'agent'
