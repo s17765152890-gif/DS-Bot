@@ -22,6 +22,7 @@ Upstream DS Bot takes the window over when it is installed — the bot team repl
 - **A switch in the window band**, beside the shell's own view switch: `原生 DSH | DS Bot`, one click either way. It only reads where the shell's switch ends; the shell's own controls are never modified.
 - **A row in the sidebar's panel list**, between Plugins and Skills, wearing the team's whale. Clicking it enters DS Bot instead of selecting a panel.
 - **A fresh install opens on the native surface**, so the plugin never hides your own workspace on first run. The choice is remembered once you switch.
+- **Follows wallpaper-engine's wallpaper and glass**: with a wallpaper on, the Bot surface lets it through its page and sidebar, and the left column borrows the same frost settings the shell sidebar uses. Each surface keeps its own sidebar width, so switching never rewrites the other.
 - **Settings stay with their own surface**: the native one keeps DSH's own Settings dialog, the bot one keeps DS Bot's.
 
 ### The memory panel: teaching a Session to a Bot
